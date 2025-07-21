@@ -49,7 +49,7 @@ __global__ void gradient_csr_kernel(
     const real* __restrict__ w,
     const int* __restrict__ row_ptr,
     const int* __restrict__ col_indice,
-    const int power,
+    const real power,
     const real* __restrict__ p,
     const real pho,
     const real* __restrict__ x_old_val,
@@ -88,7 +88,7 @@ void launch_gradient_csr(
     const real* d_w,
     const int* d_row_ptr,
     const int* d_col_indice,
-    int power,
+    const real power,
     const real* d_p,
     const real pho,
     const real* d_x_old_val,
@@ -104,12 +104,10 @@ void launch_gradient_csr(
         d_p, pho, d_x_old_val, d_utility_no_power, d_gradient);
     cudaDeviceSynchronize();
 }
-    
 template void launch_gradient_csr<double>(
-    int, const double*, const double*, const double*, const int*, const int*, int, const double*, const double, const double*, double*, double*);
+    int, const double*, const double*, const double*, const int*, const int*, const double, const double*, const double, const double*, double*, double*);
 template void launch_gradient_csr<float>(
-    int, const float*,  const float*,  const float*, const int*, const int
-*, int, const float*, const float, const float*, float*, float*); 
+    int, const float*,  const float*,  const float*, const int*, const int*, const float, const float*, const float, const float*, float*, float*);
 
 template <int blockSize, typename real>
 __global__ void objective_csr_kernel(
@@ -119,7 +117,7 @@ __global__ void objective_csr_kernel(
     const real* __restrict__ w,
     const int* __restrict__ row_ptr,
     const int* __restrict__ col_indice,
-    const int power,
+    const real power,
     real* __restrict__ objective,
     const real* __restrict__ p,
     const real pho,
@@ -189,40 +187,35 @@ void launch_objective_csr(
     const real* d_w,
     const int* d_row_ptr,
     const int* d_col_indice,
-    int power,
-    real* d_objective,      // device buffer，长度 ≥ m
-    real& h_obj,            // host 引用
+    const real power,
+    real*       d_objective,
     const real* d_p,
     const real pho,
     const real* d_x_old_val)
 {
-    constexpr int blockSize = 256;
-    int gridSize = m;
-    objective_csr_kernel<blockSize, real><<<gridSize, blockSize>>>(
+    const int blockSize = 256;                // 每 block 最多 256 线程
+    int gridSize  = m;                  // 每行一个 block
+    objective_csr_kernel<256, real><<<gridSize, blockSize, 0>>>(
         m, d_x_val, d_u_val, d_w, d_row_ptr, d_col_indice, power,
         d_objective, d_p, pho, d_x_old_val);
-
-    // 归约到 d_objective[0]
+    // 使用 blockReduce 来归约每个 block 的结果
     int numBlocks = m;
-    for (; numBlocks > 1; ) {
-        int newBlocks = (numBlocks + blockSize - 1) / blockSize;
-        blockReduce<blockSize, real><<<newBlocks, blockSize>>>(d_objective, numBlocks);
-        numBlocks = newBlocks;
+    // blockReduce<blockSize, real><<<numBlocks, blockSize, 0, stream>>>(d_objective, m);
+    for (numBlocks = m; numBlocks > 1; numBlocks = (numBlocks + blockSize - 1) / blockSize) {
+        int gridSize = (numBlocks + blockSize - 1) / blockSize;
+        blockReduce<blockSize, real><<<gridSize, blockSize, 0>>>(d_objective, numBlocks);
+        cudaDeviceSynchronize();
     }
-    cudaDeviceSynchronize();
-
-    // 从 device 拷回 host 的“标量”
-    cudaMemcpy(&h_obj, d_objective, sizeof(real), cudaMemcpyDeviceToHost);
+    // 注意：这里的 d_objective 需要
+    // 是一个足够大的数组来存储每个 block 的结果。
+    // 最终的 objective 值将存储在 d_objective[0] 中
+    cudaDeviceSynchronize();  // 确保 kernel 执行完毕
 }
-
-// 显式实例化
+// 显式实例化常用类型
 template void launch_objective_csr<double>(
-    int, const double*, const double*, const double*, const int*, const int*,
-    int, double*, double&, const double*, const double, const double*);
-
+    int, const double*, const double*, const double*, const int*, const int*, const double, double*, const double*, const double, const double*);
 template void launch_objective_csr<float>(
-    int, const float*,  const float*,  const float*, const int*, const int*,
-    int, float*,  float&,  const float*, const float, const float*);
+    int, const float*,  const float*,  const float*, const int*, const int*, const float, float*,  const float*, const float, const float*);
 
 template <int blockSize, typename real>
 __global__ void utility_csr_kernel(
@@ -231,7 +224,7 @@ __global__ void utility_csr_kernel(
     const real* __restrict__ u_val,
     const int* __restrict__ row_ptr,
     real* __restrict__ utility,
-    int power)
+    const real power)
 {
     int row = blockIdx.x;
     if (row >= m) return;
@@ -272,7 +265,7 @@ void launch_utility_csr(
     const real* d_u_val,
     const int* d_row_ptr,
     real*       d_utility,
-    int power
+    const real power
 )
 {
     int blockSize = 256;                // 每 block 最多 256 线程
@@ -284,6 +277,6 @@ void launch_utility_csr(
 
 // 显式实例化常用类型
 template void launch_utility_csr<double>(
-    int, const double*, const double*, const int*, double*, int);
+    int, const double*, const double*, const int*, double*, const double);
 template void launch_utility_csr<float>(
-    int, const float*,  const float*,  const int*, float*,  int);
+    int, const float*,  const float*,  const int*, float*,  const float);

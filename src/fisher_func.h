@@ -1,5 +1,4 @@
 #pragma once
-#pragma once
 #include <cuda_runtime.h>
 
 template <typename real>
@@ -9,7 +8,7 @@ void launch_utility_csr(
     const real* d_u_val,
     const int* d_row_ptr,
     real*       d_utility,
-    int power);
+    const real power);
 
 template <typename real>
 void launch_objective_csr(
@@ -19,9 +18,8 @@ void launch_objective_csr(
     const real* d_w,
     const int* d_row_ptr,
     const int* d_col_indice,
-    int power,
-    real* d_objective_tmp,
-    real &h_obj,
+    const real power,
+    real* d_objective,
     const real* d_p,
     const real pho,
     const real* d_x_old_val);
@@ -34,7 +32,7 @@ void launch_gradient_csr(
     const real* d_w,
     const int* d_row_ptr,
     const int* d_col_indice,
-    int power,
+    const real power,
     const real* d_p,
     const real pho,
     const real* d_x_old_val,
