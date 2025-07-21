@@ -1,0 +1,10 @@
+# ninja log v5
+5	1094	1752930073623925531	src/CMakeFiles/fisher.dir/fisher_generated_rosenbrock.cu.o	e84ff1cc2d5de10e
+4	982	1753069815276882669	src/CMakeFiles/fisher.dir/main.cpp.o	cc04dff0c8066910
+4	1372	1753067775521902214	/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir/fisher_generated_fisher_cuda.cu.o	b7b338a0f3ede53f
+5	1094	1752930073623925531	/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir/fisher_generated_rosenbrock.cu.o	e84ff1cc2d5de10e
+982	1089	1753069815382881949	src/fisher	a23b50dfdc577570
+4	1372	1753067775521902214	src/CMakeFiles/fisher.dir/fisher_generated_fisher_cuda.cu.o	b7b338a0f3ede53f
+5	8158	1752930080675060740	/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir/fisher_generated_generator.cu.o	1f9e91ac91303289
+2	67	1753080787468170198	build.ninja	2ecd770d8c9615e5
+5	8158	1752930080675060740	src/CMakeFiles/fisher.dir/fisher_generated_generator.cu.o	1f9e91ac91303289
