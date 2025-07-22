@@ -686,7 +686,7 @@ CUDAToolkit_rt_LIBRARY-ADVANCED:INTERNAL=1
 CUDA_64_BIT_DEVICE_CODE-ADVANCED:INTERNAL=1
 //List of intermediate files that are part of the cuda dependency
 // scanning.
-CUDA_ADDITIONAL_CLEAN_FILES:INTERNAL=/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir//fisher_generated_fisher_cuda.cu.o.depend;/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir//fisher_generated_fisher_dual.cu.o.depend;/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir//fisher_generated_generator.cu.o.depend;/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir//fisher_generated_rosenbrock.cu.o.depend;/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir//fisher_generated_utils.cu.o.depend
+CUDA_ADDITIONAL_CLEAN_FILES:INTERNAL=/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir//fisher_generated_fisher_cuda.cu.o.depend;/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir//fisher_generated_fisher_dual.cu.o.depend;/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir//fisher_generated_fisher_problem.cu.o.depend;/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir//fisher_generated_rosenbrock.cu.o.depend;/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir//fisher_generated_utils.cu.o.depend
 //ADVANCED property for variable: CUDA_ATTACH_VS_BUILD_RULE_TO_CUDA_FILE
 CUDA_ATTACH_VS_BUILD_RULE_TO_CUDA_FILE-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CUDA_BUILD_CUBIN

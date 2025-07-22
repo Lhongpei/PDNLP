@@ -2,7 +2,7 @@
 #include <cuda_runtime.h>
 #include <chrono>
 #include <cmath>
-#include "data.h"
+#include "fisher_problem.h"
 #include "fisher_func.h"
 #include "lbfgsbcuda.h"
 #include "utils.h"

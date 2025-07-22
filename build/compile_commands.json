@@ -4,5 +4,11 @@
   "command": "/usr/bin/g++-12 -I/home/sevan/cuLBFGSB.jl/lib/include -I/home/sevan/cuLBFGSB.jl/src -I/home/sevan/cuLBFGSB.jl/lib/include/culbfgsb -I/usr/local/cuda-12.6/include -isystem /usr/local/cuda-12.6/targets/x86_64-linux/include -g -o src/CMakeFiles/fisher.dir/main.cpp.o -c /home/sevan/cuLBFGSB.jl/src/main.cpp",
   "file": "/home/sevan/cuLBFGSB.jl/src/main.cpp",
   "output": "src/CMakeFiles/fisher.dir/main.cpp.o"
+},
+{
+  "directory": "/home/sevan/cuLBFGSB.jl/build",
+  "command": "/usr/bin/g++-12 -I/home/sevan/cuLBFGSB.jl/lib/include -I/home/sevan/cuLBFGSB.jl/src -I/home/sevan/cuLBFGSB.jl/lib/include/culbfgsb -I/usr/local/cuda-12.6/include -isystem /usr/local/cuda-12.6/targets/x86_64-linux/include -g -o src/CMakeFiles/fisher.dir/pdhg.cpp.o -c /home/sevan/cuLBFGSB.jl/src/pdhg.cpp",
+  "file": "/home/sevan/cuLBFGSB.jl/src/pdhg.cpp",
+  "output": "src/CMakeFiles/fisher.dir/pdhg.cpp.o"
 }
 ]

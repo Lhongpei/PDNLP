@@ -1,48 +1,66 @@
 #pragma once
 #include <cuda_runtime.h>
-#include <numeric>
+#include <limits>
+#include <cstddef>
+
 template <typename real>
 struct PdhgSolverState {
-    current_primal_solution: real* = nullptr;
-    current_dual_solution: real* = nullptr;
-    avg_primal_solution: real* = nullptr;
-    avg_dual_solution: real* = nullptr;
-    step_size: real = 1.0;
-    primal_weight: real = 1.0;
-    numerical_error: real = std::numeric_limits<real>::max();
-    num_outer_iterations: int = 0;    
-    num_inner_iterations: int = 0;
-    inner_solving_time: float = 0;
-    outer_solving_time: float = 0;
+    real* current_primal_solution = nullptr;
+    real* current_dual_solution   = nullptr;
+    real* avg_primal_solution     = nullptr;
+    real* avg_dual_solution       = nullptr;
+
+    real  step_size         = real{1};
+    real  primal_weight     = real{1};
+    bool  numerical_error   = false;
+    int   num_outer_iterations = 0;
+    int   num_inner_iterations = 0;
+    float inner_solving_time   = 0.0f;
+    float outer_solving_time   = 0.0f;
 };
 
 template <typename real>
 struct ResidualInfo {
-    current_primal_residual: real* = nullptr;
-    current_dual_residual: real* = nullptr;
-    current_gap: real = std::numeric_limits<real>::max();
-    avg_primal_residual: real* = nullptr;
-    avg_dual_residual: real* = nullptr;
-    avg_gap: real = std::numeric_limits<real>::max();
-    last_primal_residual: real* = nullptr;
-    last_dual_residual: real* = nullptr;
-    last_gap: real = std::numeric_limits<real>::max();
+    real* current_primal_residual = nullptr;
+    real* current_dual_residual   = nullptr;
+    real  current_gap             = std::numeric_limits<real>::max();
+    real* avg_primal_residual     = nullptr;
+    real* avg_dual_residual       = nullptr;
+    real  avg_gap                 = std::numeric_limits<real>::max();
+    real* last_primal_residual    = nullptr;
+    real* last_dual_residual      = nullptr;
+    real  last_gap                = std::numeric_limits<real>::max();
 };
 
 template <typename real>
 struct BufferState {
-    utility: real* = nullptr;
-    dual_product: real* = nullptr;
-    current_primal_sum:real* = nullptr;
-    last_primal_sum: real* = nullptr;
-    dual_sum: real = std::numeric_limits<real>::max();
+    real* utility            = nullptr;
+    real* dual_product       = nullptr;
+    real* current_primal_sum = nullptr;
+    real* last_primal_sum    = nullptr;
+    real* avg_primal_sum  = nullptr;
+    real  dual_sum           = std::numeric_limits<real>::max();
 };
+
 template <typename real>
 struct PdhgOptions {
-    restart_skip_iterations: int = 300;
-    check_frequency: int = 10;
-    max_outer_iterations: int = 10000;
-    max_inner_iterations: int = 200;
-    primal_weight: real = 1.0;
-    step_size: real = 1.0;
-}
+    int  restart_skip_iterations = 300;
+    int  check_frequency         = 10;
+    int  verbose_frequency       = 100;
+    int  max_outer_iterations    = 10'000;
+    int  max_inner_iterations    = 200;
+    real primal_weight           = real{1};
+    real step_size               = real{1};
+};
+
+template <typename real>
+struct PdhgLog {
+    int   num_outer_iterations = 0;
+    int   num_inner_iterations = 0;
+    real* primal_solution      = nullptr;
+    real* dual_solution        = nullptr;
+    float outer_solving_time   = 0.0f;
+    float inner_solving_time   = 0.0f;
+    real* primal_residual      = nullptr;
+    real* dual_residual        = nullptr;
+};

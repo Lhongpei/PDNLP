@@ -2,7 +2,7 @@
 #include <cuda_runtime.h>
 #include <chrono>
 #include <cmath>
-#include "data.h"
+#include "fisher_problem.h"
 #include "fisher_func.h"
 #include "lbfgsbcuda.h"
 #include "utils.h"
@@ -119,83 +119,83 @@ real lbfgsb_cuda_primal(
     return 0;
 }
 
-int main()
-{
-    const int m_dim = 200000;
-    const int n_dim = 10000;
-    const int nnz = 2000000;
-    const double PHO = 3.0;
-    FisherProblem csr;
-    generate_problem_gpu(m_dim, n_dim, nnz, csr, 1.0);
-    fill(csr.x0, 1.0, nnz);
-    fill(csr.u_val, 1.0, nnz);
-    fill(csr.w, 1.0, m_dim);
-    double *d_x_old = nullptr;
-    cudaMalloc(&d_x_old, nnz * sizeof(double));
-    cudaMemset(d_x_old, 0, nnz * sizeof(double));
-    fill(d_x_old, 0.5, nnz);
-    double *h_x0 = new double[nnz];
-    cudaMemcpy(h_x0, csr.x0, nnz * sizeof(double), cudaMemcpyDeviceToHost);
-    std::cout << "First 5 x0: ";
-    for (int i = 0; i < 5; ++i)
-        std::cout << h_x0[i] << " ";
-    std::cout << "\n";
-    int *h_row_ptr = new int[m_dim + 1];
-    cudaMemcpy(h_row_ptr, csr.row_ptr, (m_dim + 1) * sizeof(int), cudaMemcpyDeviceToHost);
-    std::cout << "Row pointers: ";
-    for (int i = 0; i < m_dim + 1; ++i)
-        std::cout << h_row_ptr[i] << " ";
-    std::cout << "\n";
-    int *h_col_ind = new int[nnz];
-    cudaMemcpy(h_col_ind, csr.col_ind, nnz * sizeof(int), cudaMemcpyDeviceToHost);
-    std::cout << "Column indices: ";
-    for (int i = 0; i < nnz; ++i)
-        std::cout << h_col_ind[i] << " ";
-    std::cout << "\n";
-    double *utility = new double[m_dim];
-    double *d_utility;
-    cudaMalloc(&d_utility, m_dim * sizeof(double));
-    double *p;
-    cudaMalloc(&p, n_dim * sizeof(double));
-    cudaMemset(p, 0, n_dim * sizeof(double));
-    fill(p, 0.5, n_dim);
-    double *tmp_objective;
-    cudaMalloc(&tmp_objective, m_dim * sizeof(double));
-    std::cout<< "power: " << csr.power << "\n";
-    launch_utility_csr<double>(
-        m_dim, csr.x0, csr.u_val, csr.row_ptr, d_utility, csr.power);
-    cudaDeviceSynchronize();
-    double *h_utility = new double[m_dim];
-    cudaMemcpy(h_utility, d_utility, m_dim * sizeof(double), cudaMemcpyDeviceToHost);
-    std::cout << "First 5 utility: ";
-    for (int i = 0; i < m_dim; ++i)
-        std::cout << h_utility[i] << " ";
-    std::cout << "\n";
-    double obj;
-    launch_objective_csr<double>(
-        m_dim, csr.x0, csr.u_val, csr.w, csr.row_ptr, csr.col_ind, csr.power,
-        tmp_objective, obj, p, PHO, d_x_old
-    );
-    std::cout << "Objective value: " << obj << "\n";
-    cudaMemcpy(h_utility, d_utility, m_dim * sizeof(double), cudaMemcpyDeviceToHost);
-    std::cout << "First 5 utility: ";
-    for (int i = 0; i < m_dim; ++i)
-        std::cout << h_utility[i] << " ";
-    std::cout << "\n";
-    double *d_gradient;
-    cudaMalloc(&d_gradient, nnz * sizeof(double));
-    launch_gradient_csr<double>(
-        m_dim, csr.x0, csr.u_val, csr.w, csr.row_ptr, csr.col_ind, csr.power,
-        p, PHO, d_x_old, d_utility, d_gradient
-    );
-    double *h_gradient = new double[nnz];
-    cudaMemcpy(h_gradient, d_gradient, nnz * sizeof(double), cudaMemcpyDeviceToHost);
-    std::cout << "First 5 gradient: ";
-    for (int i = 0; i < nnz; ++i)
-        std::cout << h_gradient[i] << " ";
-    std::cout << "\n";
-    lbfgsb_cuda_primal(m_dim, n_dim, nnz, csr.x0, csr.u_val, csr.w,
-                       csr.row_ptr, csr.col_ind, csr.power, p, PHO, d_x_old,
-                       d_utility, d_gradient, tmp_objective);
-    return 0;
-}
+// int main()
+// {
+//     const int m_dim = 200000;
+//     const int n_dim = 10000;
+//     const int nnz = 2000000;
+//     const double PHO = 3.0;
+//     FisherProblem csr;
+//     generate_problem_gpu(m_dim, n_dim, nnz, csr, 1.0);
+//     fill(csr.x0, 1.0, nnz);
+//     fill(csr.u_val, 1.0, nnz);
+//     fill(csr.w, 1.0, m_dim);
+//     double *d_x_old = nullptr;
+//     cudaMalloc(&d_x_old, nnz * sizeof(double));
+//     cudaMemset(d_x_old, 0, nnz * sizeof(double));
+//     fill(d_x_old, 0.5, nnz);
+//     double *h_x0 = new double[nnz];
+//     cudaMemcpy(h_x0, csr.x0, nnz * sizeof(double), cudaMemcpyDeviceToHost);
+//     std::cout << "First 5 x0: ";
+//     for (int i = 0; i < 5; ++i)
+//         std::cout << h_x0[i] << " ";
+//     std::cout << "\n";
+//     int *h_row_ptr = new int[m_dim + 1];
+//     cudaMemcpy(h_row_ptr, csr.row_ptr, (m_dim + 1) * sizeof(int), cudaMemcpyDeviceToHost);
+//     std::cout << "Row pointers: ";
+//     for (int i = 0; i < m_dim + 1; ++i)
+//         std::cout << h_row_ptr[i] << " ";
+//     std::cout << "\n";
+//     int *h_col_ind = new int[nnz];
+//     cudaMemcpy(h_col_ind, csr.col_ind, nnz * sizeof(int), cudaMemcpyDeviceToHost);
+//     std::cout << "Column indices: ";
+//     for (int i = 0; i < nnz; ++i)
+//         std::cout << h_col_ind[i] << " ";
+//     std::cout << "\n";
+//     double *utility = new double[m_dim];
+//     double *d_utility;
+//     cudaMalloc(&d_utility, m_dim * sizeof(double));
+//     double *p;
+//     cudaMalloc(&p, n_dim * sizeof(double));
+//     cudaMemset(p, 0, n_dim * sizeof(double));
+//     fill(p, 0.5, n_dim);
+//     double *tmp_objective;
+//     cudaMalloc(&tmp_objective, m_dim * sizeof(double));
+//     std::cout<< "power: " << csr.power << "\n";
+//     launch_utility_csr<double>(
+//         m_dim, csr.x0, csr.u_val, csr.row_ptr, d_utility, csr.power);
+//     cudaDeviceSynchronize();
+//     double *h_utility = new double[m_dim];
+//     cudaMemcpy(h_utility, d_utility, m_dim * sizeof(double), cudaMemcpyDeviceToHost);
+//     std::cout << "First 5 utility: ";
+//     for (int i = 0; i < m_dim; ++i)
+//         std::cout << h_utility[i] << " ";
+//     std::cout << "\n";
+//     double obj;
+//     launch_objective_csr<double>(
+//         m_dim, csr.x0, csr.u_val, csr.w, csr.row_ptr, csr.col_ind, csr.power,
+//         tmp_objective, obj, p, PHO, d_x_old
+//     );
+//     std::cout << "Objective value: " << obj << "\n";
+//     cudaMemcpy(h_utility, d_utility, m_dim * sizeof(double), cudaMemcpyDeviceToHost);
+//     std::cout << "First 5 utility: ";
+//     for (int i = 0; i < m_dim; ++i)
+//         std::cout << h_utility[i] << " ";
+//     std::cout << "\n";
+//     double *d_gradient;
+//     cudaMalloc(&d_gradient, nnz * sizeof(double));
+//     launch_gradient_csr<double>(
+//         m_dim, csr.x0, csr.u_val, csr.w, csr.row_ptr, csr.col_ind, csr.power,
+//         p, PHO, d_x_old, d_utility, d_gradient
+//     );
+//     double *h_gradient = new double[nnz];
+//     cudaMemcpy(h_gradient, d_gradient, nnz * sizeof(double), cudaMemcpyDeviceToHost);
+//     std::cout << "First 5 gradient: ";
+//     for (int i = 0; i < nnz; ++i)
+//         std::cout << h_gradient[i] << " ";
+//     std::cout << "\n";
+//     lbfgsb_cuda_primal(m_dim, n_dim, nnz, csr.x0, csr.u_val, csr.w,
+//                        csr.row_ptr, csr.col_ind, csr.power, p, PHO, d_x_old,
+//                        d_utility, d_gradient, tmp_objective);
+//     return 0;
+// }

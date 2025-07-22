@@ -122,7 +122,8 @@ __global__ void objective_csr_kernel(
     real* __restrict__ objective,
     const real* __restrict__ p,
     const real pho,
-    const real* __restrict__ x_old_val)
+    const real* __restrict__ x_old_val,
+    const real*)
 {
     int row = blockIdx.x;
     if (row >= m) return;
@@ -175,7 +176,7 @@ __global__ void objective_csr_kernel(
         x_delta = warpReduce<real>(x_delta);
     }
     if (tid == 0) {
-        real log_sum = logf(fmaxf(sum, 1e-12f));
+        real log_sum = logf(fmaxf(powf(sum, 1.0/power), 1e-12f));
         // printf("Block %d processing row %d: sum = %f, ptot = %f, x_delta = %f\n", blockIdx.x, row, sum, ptot, x_delta); // 输出调试信息
         objective[row] = -w[row] * log_sum + ptot + (0.5f / pho) * x_delta;
     }

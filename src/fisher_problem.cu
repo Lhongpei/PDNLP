@@ -5,18 +5,8 @@
 #include <thrust/sort.h>
 #include <thrust/unique.h>
 #include <thrust/execution_policy.h>
+#include "fisher_problem.h"
 
-// 定义 FisherProblem 结构体
-struct FisherProblem {
-    double* x0;
-    double* w;
-    double* u_val;
-    double* b;
-    int* col_ind;
-    int* row_ptr;
-    double* bounds;
-    double power;
-};
 
 // 初始化随机数生成器
 __global__ void setup_rng(curandState* state, unsigned long long seed, int nnz) {
@@ -159,7 +149,7 @@ void build_csr_uniform(int m, int n, int nnz,
     col_ind.shrink_to_fit();
 }
 
-void generate_problem_gpu(int m, int n, int nnz, FisherProblem &csr, double power = 1.0) {
+void generate_problem_gpu(int m, int n, int nnz, FisherProblem &csr, double power) {
     // 1. 设备内存分配（不变）
     cudaMalloc(&csr.x0,      nnz * sizeof(double));
     cudaMalloc(&csr.w,       nnz * sizeof(double));
@@ -173,6 +163,9 @@ void generate_problem_gpu(int m, int n, int nnz, FisherProblem &csr, double powe
     cudaMalloc(&d_u_sum_dim_1, m * sizeof(double));
     cudaMalloc(&d_vec_val,     m * sizeof(double));
     csr.power = power;
+    csr.m_dim = m;
+    csr.n_dim = n;
+    csr.nnz = nnz;
 
     // ---------- 2. CPU 端直接生成合法 CSR ----------
     // 2.1 每行非零个数

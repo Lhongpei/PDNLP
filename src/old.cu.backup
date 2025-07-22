@@ -204,7 +204,7 @@ void generate_problem_gpu(int m, int n, int nnz, FisherProblem &csr, double powe
 }
 #include <iostream>
 #include <cuda_runtime.h>
-#include "data.h"
+#include "fisher_problem.h"
 #include "fisher_func.h"
 int main() {
     const int m_dim = 100;
