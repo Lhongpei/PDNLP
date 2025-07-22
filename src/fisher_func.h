@@ -20,6 +20,7 @@ void launch_objective_csr(
     const int* d_col_indice,
     const real power,
     real* d_objective,
+    real& obj,
     const real* d_p,
     const real pho,
     const real* d_x_old_val);

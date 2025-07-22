@@ -33,7 +33,7 @@
 			{
 				"command" : 1,
 				"file" : 1,
-				"line" : 7,
+				"line" : 8,
 				"parent" : 0
 			},
 			{
@@ -51,7 +51,7 @@
 			{
 				"command" : 2,
 				"file" : 1,
-				"line" : 12,
+				"line" : 13,
 				"parent" : 0
 			},
 			{
@@ -88,13 +88,13 @@
 			{
 				"command" : 5,
 				"file" : 3,
-				"line" : 10,
+				"line" : 18,
 				"parent" : 10
 			},
 			{
 				"command" : 5,
 				"file" : 3,
-				"line" : 11,
+				"line" : 19,
 				"parent" : 10
 			},
 			{
@@ -153,7 +153,7 @@
 			"language" : "CXX",
 			"sourceIndexes" : 
 			[
-				7
+				14
 			]
 		}
 	],
@@ -227,25 +227,33 @@
 			[
 				0,
 				1,
-				2
+				2,
+				3,
+				4
 			]
 		},
 		{
 			"name" : "Header Files",
 			"sourceIndexes" : 
 			[
-				3,
-				4
+				5,
+				6,
+				7,
+				8,
+				9,
+				10
 			]
 		},
 		{
 			"name" : "Source Files",
 			"sourceIndexes" : 
 			[
-				5,
-				6,
-				7,
-				8
+				11,
+				12,
+				13,
+				14,
+				15,
+				16
 			]
 		}
 	],
@@ -255,6 +263,12 @@
 			"backtrace" : 2,
 			"isGenerated" : true,
 			"path" : "build/src/CMakeFiles/fisher.dir/fisher_generated_fisher_cuda.cu.o",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 2,
+			"isGenerated" : true,
+			"path" : "build/src/CMakeFiles/fisher.dir/fisher_generated_fisher_dual.cu.o",
 			"sourceGroupIndex" : 0
 		},
 		{
@@ -271,7 +285,23 @@
 		},
 		{
 			"backtrace" : 2,
+			"isGenerated" : true,
+			"path" : "build/src/CMakeFiles/fisher.dir/fisher_generated_utils.cu.o",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 2,
+			"path" : "src/const.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 2,
 			"path" : "src/data.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 2,
+			"path" : "src/fisher_dual.h",
 			"sourceGroupIndex" : 1
 		},
 		{
@@ -281,7 +311,22 @@
 		},
 		{
 			"backtrace" : 2,
+			"path" : "src/pdhg_struct.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 2,
+			"path" : "src/utils.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 2,
 			"path" : "src/fisher_cuda.cu",
+			"sourceGroupIndex" : 2
+		},
+		{
+			"backtrace" : 2,
+			"path" : "src/fisher_dual.cu",
 			"sourceGroupIndex" : 2
 		},
 		{
@@ -298,6 +343,11 @@
 		{
 			"backtrace" : 2,
 			"path" : "src/rosenbrock.cu",
+			"sourceGroupIndex" : 2
+		},
+		{
+			"backtrace" : 2,
+			"path" : "src/utils.cu",
 			"sourceGroupIndex" : 2
 		}
 	],

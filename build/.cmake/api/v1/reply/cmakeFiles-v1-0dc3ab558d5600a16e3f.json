@@ -240,6 +240,15 @@
 		},
 		{
 			"isGenerated" : true,
+			"path" : "build/src/CMakeFiles/fisher.dir/fisher_generated_fisher_dual.cu.o.depend"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.28/Modules/FindCUDA/run_nvcc.cmake"
+		},
+		{
+			"isGenerated" : true,
 			"path" : "build/src/CMakeFiles/fisher.dir/fisher_generated_generator.cu.o.depend"
 		},
 		{
@@ -258,7 +267,20 @@
 		},
 		{
 			"isGenerated" : true,
+			"path" : "build/src/CMakeFiles/fisher.dir/fisher_generated_utils.cu.o.depend"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.28/Modules/FindCUDA/run_nvcc.cmake"
+		},
+		{
+			"isGenerated" : true,
 			"path" : "build/src/CMakeFiles/fisher.dir/fisher_generated_fisher_cuda.cu.o.cmake.pre-gen"
+		},
+		{
+			"isGenerated" : true,
+			"path" : "build/src/CMakeFiles/fisher.dir/fisher_generated_fisher_dual.cu.o.cmake.pre-gen"
 		},
 		{
 			"isGenerated" : true,
@@ -267,6 +289,10 @@
 		{
 			"isGenerated" : true,
 			"path" : "build/src/CMakeFiles/fisher.dir/fisher_generated_rosenbrock.cu.o.cmake.pre-gen"
+		},
+		{
+			"isGenerated" : true,
+			"path" : "build/src/CMakeFiles/fisher.dir/fisher_generated_utils.cu.o.cmake.pre-gen"
 		}
 	],
 	"kind" : "cmakeFiles",

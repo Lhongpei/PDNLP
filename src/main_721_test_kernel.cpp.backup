@@ -87,9 +87,8 @@ real lbfgsb_cuda_primal(
 
 
     cudaMemset(xl, 1e-3, nnz * sizeof(real));
-    cudaMemset(xu, 0, nnz * sizeof(real));
-    fill(nbd, 1, nnz);
-    fill(xl, 1e-3, nnz);
+    cudaMemset(xu, 1, nnz * sizeof(real));
+    cudaMemset(nbd, 1, nnz * sizeof(int));
     cudaMemcpy(d_x_val, xl, nnz * sizeof(real), cudaMemcpyDeviceToDevice);
     LBFGSB_CUDA_SUMMARY<real> summary;
     memset(&summary, 0, sizeof(summary));
@@ -121,9 +120,9 @@ real lbfgsb_cuda_primal(
 
 int main()
 {
-    const int m_dim = 200000;
-    const int n_dim = 10000;
-    const int nnz = 2000000;
+    const int m_dim = 20;
+    const int n_dim = 10;
+    const int nnz = 200;
     const double PHO = 3.0;
     FisherProblem csr;
     generate_problem_gpu(m_dim, n_dim, nnz, csr, 1.0);
@@ -194,8 +193,5 @@ int main()
     for (int i = 0; i < nnz; ++i)
         std::cout << h_gradient[i] << " ";
     std::cout << "\n";
-    lbfgsb_cuda_primal(m_dim, n_dim, nnz, csr.x0, csr.u_val, csr.w,
-                       csr.row_ptr, csr.col_ind, csr.power, p, PHO, d_x_old,
-                       d_utility, d_gradient, tmp_objective);
     return 0;
 }

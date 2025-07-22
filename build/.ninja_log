@@ -1,10 +1,14 @@
 # ninja log v5
-5	1094	1752930073623925531	src/CMakeFiles/fisher.dir/fisher_generated_rosenbrock.cu.o	e84ff1cc2d5de10e
-4	982	1753069815276882669	src/CMakeFiles/fisher.dir/main.cpp.o	cc04dff0c8066910
-4	1372	1753067775521902214	/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir/fisher_generated_fisher_cuda.cu.o	b7b338a0f3ede53f
-5	1094	1752930073623925531	/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir/fisher_generated_rosenbrock.cu.o	e84ff1cc2d5de10e
-982	1089	1753069815382881949	src/fisher	a23b50dfdc577570
-4	1372	1753067775521902214	src/CMakeFiles/fisher.dir/fisher_generated_fisher_cuda.cu.o	b7b338a0f3ede53f
-5	8158	1752930080675060740	/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir/fisher_generated_generator.cu.o	1f9e91ac91303289
-2	67	1753080787468170198	build.ninja	2ecd770d8c9615e5
-5	8158	1752930080675060740	src/CMakeFiles/fisher.dir/fisher_generated_generator.cu.o	1f9e91ac91303289
+2	20933	1753103944826479748	/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir/fisher_generated_generator.cu.o	1f9e91ac91303289
+2	20933	1753103944826479748	src/CMakeFiles/fisher.dir/fisher_generated_generator.cu.o	1f9e91ac91303289
+1	5117	1753103929052930641	/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir/fisher_generated_fisher_cuda.cu.o	b7b338a0f3ede53f
+1	5117	1753103929052930641	src/CMakeFiles/fisher.dir/fisher_generated_fisher_cuda.cu.o	b7b338a0f3ede53f
+2	3136	1753103927072987475	src/CMakeFiles/fisher.dir/fisher_generated_rosenbrock.cu.o	e84ff1cc2d5de10e
+2	3136	1753103927072987475	/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir/fisher_generated_rosenbrock.cu.o	e84ff1cc2d5de10e
+1	104	1753104041664779704	build.ninja	2ecd770d8c9615e5
+4	3470	1753104045132685025	src/CMakeFiles/fisher.dir/fisher_generated_utils.cu.o	35f0c2e89fe5cecc
+4	3470	1753104045132685025	/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir/fisher_generated_utils.cu.o	35f0c2e89fe5cecc
+4	3501	1753104072815933831	src/CMakeFiles/fisher.dir/fisher_generated_fisher_dual.cu.o	a3f40db32d423bc5
+4	3501	1753104072815933831	/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir/fisher_generated_fisher_dual.cu.o	a3f40db32d423bc5
+3501	4387	1753104073712909625	src/CMakeFiles/fisher.dir/main.cpp.o	cc04dff0c8066910
+4387	4467	1753104073792907466	src/fisher	b8d9c52acd663b34

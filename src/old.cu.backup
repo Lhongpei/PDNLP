@@ -173,8 +173,8 @@ void generate_problem_gpu(int m, int n, int nnz, FisherProblem &csr, double powe
     // 9. 计算 u_sum_dim_1 和 vec_val
     compute_u_sum_dim_1_and_vec_val<<<(m+255)/256, 256>>>(csr.u_val, csr.row_ptr, csr.b, d_u_sum_dim_1, d_vec_val, m);
 //     // 检查 u_sum_dim_1 的值
-double* h_u_sum_dim_1 = new double[m];
-cudaMemcpy(h_u_sum_dim_1, d_u_sum_dim_1, m * sizeof(double), cudaMemcpyDeviceToHost);
+    double* h_u_sum_dim_1 = new double[m];
+    cudaMemcpy(h_u_sum_dim_1, d_u_sum_dim_1, m * sizeof(double), cudaMemcpyDeviceToHost);
     for (int i = 0; i < m; ++i) {
         printf("u_sum_dim_1[%d] = %f\n", i, h_u_sum_dim_1[i]);
     }

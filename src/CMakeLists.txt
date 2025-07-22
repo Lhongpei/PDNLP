@@ -3,7 +3,8 @@ file(GLOB HDR "./*.h")
 find_package(CUDAToolkit REQUIRED)
 include_directories(${CMAKE_SOURCE_DIR}/lib/include/culbfgsb)
 include_directories(${CMAKE_SOURCE_DIR}/src)
-
+# show all SRC
+message(SRC: ${SRC})
 cuda_add_executable(fisher
   ${HDR}
   ${SRC}

@@ -72,7 +72,7 @@ set(generated_file_internal "/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher
 set(generated_cubin_file_internal "/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir//./fisher_generated_rosenbrock.cu.o.cubin.txt") # path
 
 set(CUDA_NVCC_EXECUTABLE "/usr/local/cuda-12.6/bin/nvcc") # path
-set(CUDA_NVCC_FLAGS  ;; ) # list
+set(CUDA_NVCC_FLAGS -gencode;arch=compute_60,code=sm_60;-gencode;arch=compute_61,code=sm_61;-gencode;arch=compute_70,code=sm_70;-gencode;arch=compute_72,code=sm_72;-gencode;arch=compute_75,code=sm_75;-gencode;arch=compute_86,code=sm_86;-gencode;arch=compute_90,code=sm_90 ;; ) # list
 # Build specific configuration flags
 set(CUDA_NVCC_FLAGS_DEBUG  ; )
 set(CUDA_NVCC_FLAGS_MINSIZEREL  ; )

@@ -1,5 +1,6 @@
 #include "fisher_func.h"
-#include <math.h>  
+#include <math.h> 
+#include <stdio.h> 
 template <typename real>
 __device__ real max(real a, real b) {
     return (a > b) ? a : b;
@@ -175,6 +176,7 @@ __global__ void objective_csr_kernel(
     }
     if (tid == 0) {
         real log_sum = logf(fmaxf(sum, 1e-12f));
+        // printf("Block %d processing row %d: sum = %f, ptot = %f, x_delta = %f\n", blockIdx.x, row, sum, ptot, x_delta); // 输出调试信息
         objective[row] = -w[row] * log_sum + ptot + (0.5f / pho) * x_delta;
     }
 }
@@ -189,6 +191,7 @@ void launch_objective_csr(
     const int* d_col_indice,
     const real power,
     real*       d_objective,
+    real&       obj,
     const real* d_p,
     const real pho,
     const real* d_x_old_val)
@@ -210,12 +213,13 @@ void launch_objective_csr(
     // 是一个足够大的数组来存储每个 block 的结果。
     // 最终的 objective 值将存储在 d_objective[0] 中
     cudaDeviceSynchronize();  // 确保 kernel 执行完毕
+    cudaMemcpy(&obj, d_objective, sizeof(real), cudaMemcpyDeviceToHost);
 }
 // 显式实例化常用类型
 template void launch_objective_csr<double>(
-    int, const double*, const double*, const double*, const int*, const int*, const double, double*, const double*, const double, const double*);
+    int, const double*, const double*, const double*, const int*, const int*, const double, double*, double&, const double*, const double, const double*);
 template void launch_objective_csr<float>(
-    int, const float*,  const float*,  const float*, const int*, const int*, const float, float*,  const float*, const float, const float*);
+    int, const float*,  const float*,  const float*, const int*, const int*, const float, float*, float&,  const float*, const float, const float*);
 
 template <int blockSize, typename real>
 __global__ void utility_csr_kernel(
@@ -228,7 +232,8 @@ __global__ void utility_csr_kernel(
 {
     int row = blockIdx.x;
     if (row >= m) return;
-
+    //show blockIdx.x
+    
     int start = row_ptr[row];
     int end   = row_ptr[row + 1];
 
@@ -239,10 +244,11 @@ __global__ void utility_csr_kernel(
     for (int j = start + tid; j < end; j += blockDim.x) {
         real xi = x_val[j];
         real ui = u_val[j];
-        real tmp = 1.0;
+        // printf("sum = %f, row = %d, xi = %f, ui = %f\n", sum, row, xi, ui); // 输出调试信息
         // for (int k = 0; k < power; ++k) tmp *= xi;
         sum += pow(xi, power) * ui;  // 使用 pow 函数计算 xi 的 power 次方
     }
+    
     shm[tid] = sum;
     __syncthreads();
 
@@ -255,7 +261,10 @@ __global__ void utility_csr_kernel(
     if (tid < 32) {
         sum = warpReduce<real>(sum);
     }
-    if (tid == 0) utility[row] = sum;
+    if (tid == 0) {
+        utility[row] = sum;
+        // printf("Block %d processing row %d: sum = %f\n", blockIdx.x, row, sum); // 输出调试信息
+    }
 }
 
 template <typename real>
@@ -268,9 +277,9 @@ void launch_utility_csr(
     const real power
 )
 {
-    int blockSize = 256;                // 每 block 最多 256 线程
+    const int blockSize = 10;                // 每 block 最多 256 线程
     int gridSize  = m;                  // 每行一个 block
-    utility_csr_kernel<256, real><<<gridSize, blockSize, 0>>>(
+    utility_csr_kernel<blockSize, real><<<gridSize, blockSize, 0>>>(
         m, d_x_val, d_u_val, d_row_ptr, d_utility, power);
     cudaDeviceSynchronize();
 }

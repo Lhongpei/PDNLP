@@ -130,114 +130,6 @@
 			"value" : "/usr/bin/ctest"
 		},
 		{
-			"name" : "CMAKE_CUDA_ARCHITECTURES",
-			"properties" : 
-			[
-				{
-					"name" : "HELPSTRING",
-					"value" : "CUDA architectures"
-				}
-			],
-			"type" : "STRING",
-			"value" : "52"
-		},
-		{
-			"name" : "CMAKE_CUDA_COMPILER",
-			"properties" : 
-			[
-				{
-					"name" : "ADVANCED",
-					"value" : "1"
-				},
-				{
-					"name" : "HELPSTRING",
-					"value" : "CUDA compiler"
-				}
-			],
-			"type" : "STRING",
-			"value" : "/usr/bin/nvcc"
-		},
-		{
-			"name" : "CMAKE_CUDA_FLAGS",
-			"properties" : 
-			[
-				{
-					"name" : "ADVANCED",
-					"value" : "1"
-				},
-				{
-					"name" : "HELPSTRING",
-					"value" : "Flags used by the CUDA compiler during all build types."
-				}
-			],
-			"type" : "STRING",
-			"value" : ""
-		},
-		{
-			"name" : "CMAKE_CUDA_FLAGS_DEBUG",
-			"properties" : 
-			[
-				{
-					"name" : "ADVANCED",
-					"value" : "1"
-				},
-				{
-					"name" : "HELPSTRING",
-					"value" : "Flags used by the CUDA compiler during DEBUG builds."
-				}
-			],
-			"type" : "STRING",
-			"value" : "-g"
-		},
-		{
-			"name" : "CMAKE_CUDA_FLAGS_MINSIZEREL",
-			"properties" : 
-			[
-				{
-					"name" : "ADVANCED",
-					"value" : "1"
-				},
-				{
-					"name" : "HELPSTRING",
-					"value" : "Flags used by the CUDA compiler during MINSIZEREL builds."
-				}
-			],
-			"type" : "STRING",
-			"value" : "-O1 -DNDEBUG"
-		},
-		{
-			"name" : "CMAKE_CUDA_FLAGS_RELEASE",
-			"properties" : 
-			[
-				{
-					"name" : "ADVANCED",
-					"value" : "1"
-				},
-				{
-					"name" : "HELPSTRING",
-					"value" : "Flags used by the CUDA compiler during RELEASE builds."
-				}
-			],
-			"type" : "STRING",
-			"value" : "-O3 -DNDEBUG"
-		},
-		{
-			"name" : "CMAKE_CUDA_FLAGS_RELWITHDEBINFO",
-			"properties" : 
-			[
-				{
-					"name" : "ADVANCED",
-					"value" : "1"
-				},
-				{
-					"name" : "HELPSTRING",
-					"value" : "Flags used by the CUDA compiler during RELWITHDEBINFO builds."
-				}
-			],
-			"type" : "STRING",
-			"value" : "-O2 -g -DNDEBUG"
-		},
-		{
 			"name" : "CMAKE_CXX_COMPILER",
 			"properties" : 
 			[
@@ -247,10 +139,10 @@
 				},
 				{
 					"name" : "HELPSTRING",
-					"value" : "No help, variable specified on the command line."
+					"value" : "CXX compiler"
 				}
 			],
-			"type" : "FILEPATH",
+			"type" : "STRING",
 			"value" : "/usr/bin/g++-12"
 		},
 		{
@@ -375,10 +267,10 @@
 				},
 				{
 					"name" : "HELPSTRING",
-					"value" : "No help, variable specified on the command line."
+					"value" : "C compiler"
 				}
 			],
-			"type" : "FILEPATH",
+			"type" : "STRING",
 			"value" : "/usr/bin/gcc-12"
 		},
 		{
@@ -1339,7 +1231,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir//fisher_generated_fisher_cuda.cu.o.depend;/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir//fisher_generated_generator.cu.o.depend;/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir//fisher_generated_rosenbrock.cu.o.depend"
+			"value" : "/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir//fisher_generated_fisher_cuda.cu.o.depend;/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir//fisher_generated_fisher_dual.cu.o.depend;/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir//fisher_generated_generator.cu.o.depend;/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir//fisher_generated_rosenbrock.cu.o.depend;/home/sevan/cuLBFGSB.jl/build/src/CMakeFiles/fisher.dir//fisher_generated_utils.cu.o.depend"
 		},
 		{
 			"name" : "CUDA_ATTACH_VS_BUILD_RULE_TO_CUDA_FILE",
@@ -1436,18 +1328,6 @@
 			],
 			"type" : "FILEPATH",
 			"value" : "/usr/lib/x86_64-linux-gnu/libcuda.so"
-		},
-		{
-			"name" : "CUDA_DIR",
-			"properties" : 
-			[
-				{
-					"name" : "HELPSTRING",
-					"value" : "The directory containing a CMake configuration file for CUDA."
-				}
-			],
-			"type" : "PATH",
-			"value" : "CUDA_DIR-NOTFOUND"
 		},
 		{
 			"name" : "CUDA_GENERATED_OUTPUT_DIR",
@@ -2966,42 +2846,6 @@
 			"value" : "[TRUE][v()]"
 		},
 		{
-			"name" : "MyFisherProject_BINARY_DIR",
-			"properties" : 
-			[
-				{
-					"name" : "HELPSTRING",
-					"value" : "Value Computed by CMake"
-				}
-			],
-			"type" : "STATIC",
-			"value" : "/home/sevan/cuLBFGSB.jl/build/src"
-		},
-		{
-			"name" : "MyFisherProject_IS_TOP_LEVEL",
-			"properties" : 
-			[
-				{
-					"name" : "HELPSTRING",
-					"value" : "Value Computed by CMake"
-				}
-			],
-			"type" : "STATIC",
-			"value" : "OFF"
-		},
-		{
-			"name" : "MyFisherProject_SOURCE_DIR",
-			"properties" : 
-			[
-				{
-					"name" : "HELPSTRING",
-					"value" : "Value Computed by CMake"
-				}
-			],
-			"type" : "STATIC",
-			"value" : "/home/sevan/cuLBFGSB.jl/src"
-		},
-		{
 			"name" : "_CMAKE_LINKER_PUSHPOP_STATE_SUPPORTED",
 			"properties" : 
 			[
@@ -3072,42 +2916,6 @@
 			],
 			"type" : "STATIC",
 			"value" : "/home/sevan/cuLBFGSB.jl"
-		},
-		{
-			"name" : "fisher\u00a0_BINARY_DIR",
-			"properties" : 
-			[
-				{
-					"name" : "HELPSTRING",
-					"value" : "Value Computed by CMake"
-				}
-			],
-			"type" : "STATIC",
-			"value" : "/home/sevan/cuLBFGSB.jl/build/src"
-		},
-		{
-			"name" : "fisher\u00a0_IS_TOP_LEVEL",
-			"properties" : 
-			[
-				{
-					"name" : "HELPSTRING",
-					"value" : "Value Computed by CMake"
-				}
-			],
-			"type" : "STATIC",
-			"value" : "OFF"
-		},
-		{
-			"name" : "fisher\u00a0_SOURCE_DIR",
-			"properties" : 
-			[
-				{
-					"name" : "HELPSTRING",
-					"value" : "Value Computed by CMake"
-				}
-			],
-			"type" : "STATIC",
-			"value" : "/home/sevan/cuLBFGSB.jl/src"
 		}
 	],
 	"kind" : "cache",
