@@ -1,2 +1,3 @@
 lib/libcuLBFGSB.so
 build/*
+.VSCodeCounter/*

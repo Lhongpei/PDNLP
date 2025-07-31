@@ -6,6 +6,7 @@
 #include "fisher_func.h"
 #include "lbfgsbcuda.h"
 #include "utils.h"
+#include "increment.h"
 template <typename real>
 real lbfgsb_cuda_primal(
     const int row,
@@ -87,9 +88,8 @@ real lbfgsb_cuda_primal(
 
 
     cudaMemset(xl, 1e-3, nnz * sizeof(real));
-    cudaMemset(xu, 0, nnz * sizeof(real));
-    fill(nbd, 1, nnz);
-    fill(xl, 1e-3, nnz);
+    cudaMemset(xu, 1, nnz * sizeof(real));
+    cudaMemset(nbd, 1, nnz * sizeof(int));
     cudaMemcpy(d_x_val, xl, nnz * sizeof(real), cudaMemcpyDeviceToDevice);
     LBFGSB_CUDA_SUMMARY<real> summary;
     memset(&summary, 0, sizeof(summary));
@@ -121,13 +121,13 @@ real lbfgsb_cuda_primal(
 
 // int main()
 // {
-//     const int row_dim = 200000;
-//     const int col_dim = 10000;
-//     const int nnz = 2000000;
-//     const double tau = 3.0;
+//     const int row_dim = 3;
+//     const int col_dim = 2;
+//     const int nnz = 6;
+//     const double tau = 1.0;
 //     FisherProblem csr;
-//     generate_problem_gpu(row_dim, col_dim, nnz, csr, 1.0);
-//     fill(csr.x0, 1.0, nnz);
+//     generate_problem_gpu(row_dim, col_dim, nnz, csr, 0.5);
+//     fill(csr.x0, 4.0, nnz);
 //     fill(csr.u_val, 1.0, nnz);
 //     fill(csr.w, 1.0, row_dim);
 //     double *d_x_old = nullptr;
@@ -137,7 +137,7 @@ real lbfgsb_cuda_primal(
 //     double *h_x0 = new double[nnz];
 //     cudaMemcpy(h_x0, csr.x0, nnz * sizeof(double), cudaMemcpyDeviceToHost);
 //     std::cout << "First 5 x0: ";
-//     for (int i = 0; i < 5; ++i)
+//     for (int i = 0; i < nnz; ++i)
 //         std::cout << h_x0[i] << " ";
 //     std::cout << "\n";
 //     int *h_row_ptr = new int[row_dim + 1];
@@ -158,7 +158,7 @@ real lbfgsb_cuda_primal(
 //     double *p;
 //     cudaMalloc(&p, col_dim * sizeof(double));
 //     cudaMemset(p, 0, col_dim * sizeof(double));
-//     fill(p, 0.5, col_dim);
+//     fill(p, -1.0, col_dim);
 //     double *tmp_objective;
 //     cudaMalloc(&tmp_objective, row_dim * sizeof(double));
 //     std::cout<< "power: " << csr.power << "\n";
@@ -172,12 +172,21 @@ real lbfgsb_cuda_primal(
 //         std::cout << h_utility[i] << " ";
 //     std::cout << "\n";
 //     double obj;
+//     double *x_sum = nullptr;
+//     cudaMalloc(&x_sum, col_dim * sizeof(double));
+//     cudaMemset(x_sum, 0, col_dim * sizeof(double));
 //     launch_objective_csr<double>(
-//         row_dim, csr.x0, csr.u_val, csr.w, csr.row_ptr, csr.col_ind, csr.power,
-//         tmp_objective, obj, p, tau, d_x_old
+//         row_dim, col_dim, nnz, csr.x0, csr.u_val, csr.w, csr.row_ptr, csr.col_ind, csr.power,
+//         tmp_objective, obj, x_sum, p, tau, d_x_old
 //     );
 //     std::cout << "Objective value: " << obj << "\n";
 //     cudaMemcpy(h_utility, d_utility, row_dim * sizeof(double), cudaMemcpyDeviceToHost);
+//     double *h_x_sum = new double[col_dim];
+//     cudaMemcpy(h_x_sum, x_sum, col_dim * sizeof(double), cudaMemcpyDeviceToHost);
+//     std::cout << "First 5 x_sum: ";
+//     for (int i = 0; i < col_dim; ++i)
+//         std::cout << h_x_sum[i] << " ";
+//     std::cout << "\n";
 //     std::cout << "First 5 utility: ";
 //     for (int i = 0; i < row_dim; ++i)
 //         std::cout << h_utility[i] << " ";
@@ -194,8 +203,15 @@ real lbfgsb_cuda_primal(
 //     for (int i = 0; i < nnz; ++i)
 //         std::cout << h_gradient[i] << " ";
 //     std::cout << "\n";
-//     lbfgsb_cuda_primal(row_dim, col_dim, nnz, csr.x0, csr.u_val, csr.w,
-//                        csr.row_ptr, csr.col_ind, csr.power, p, tau, d_x_old,
-//                        d_utility, d_gradient, tmp_objective);
+
+//     double *b = nullptr;
+//     cudaMalloc(&b, col_dim * sizeof(double));
+//     fill(b, 1.0, col_dim);
+//     double res_feasibility = cal_feasibility(col_dim, x_sum, b, true);
+//     std::cout << "Feasibility residual: " << res_feasibility << "\n";
+
+//     double res_dual = cal_dual_res<double>(row_dim, col_dim, nnz, d_utility, csr.w, csr.x0, csr.u_val, csr.row_ptr, csr.col_ind, p, csr.power, true);
+//     std::cout << "Dual residual: " << res_dual << "\n";
+    
 //     return 0;
 // }

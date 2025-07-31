@@ -6,7 +6,8 @@ endif()
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c14")
 
 find_package(CUDA REQUIRED)
-
+set(CMAKE_CUDA_STANDARD 17)
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 foreach(ComputeCapability 60 61 70 72 75 86 90)
   set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode;arch=compute_${ComputeCapability},code=sm_${ComputeCapability})
 endforeach()

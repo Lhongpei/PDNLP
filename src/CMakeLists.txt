@@ -1,6 +1,7 @@
 file(GLOB SRC "./*.cpp" "./*.cu")
 file(GLOB HDR "./*.h")
 find_package(CUDAToolkit REQUIRED)
+message(STATUS "CMake is using CUDA Toolkit version: ${CUDAToolkit_VERSION}")
 include_directories(${CMAKE_SOURCE_DIR}/lib/include/culbfgsb)
 include_directories(${CMAKE_SOURCE_DIR}/src)
 # show all SRC

@@ -7,8 +7,12 @@ template <typename real>
 struct PdhgSolverState {
     real* current_primal_solution = nullptr;
     real* current_dual_solution   = nullptr;
+    real* last_primal_solution     = nullptr;
+    real* last_dual_solution       = nullptr;
     real* avg_primal_solution     = nullptr;
     real* avg_dual_solution       = nullptr;
+
+    real* primal_gradient       = nullptr;
 
     real  step_size         = real{1};
     real  primal_weight     = real{1};
@@ -17,23 +21,36 @@ struct PdhgSolverState {
     int   num_inner_iterations = 0;
     float inner_solving_time   = 0.0f;
     float outer_solving_time   = 0.0f;
+
 };
 
 template <typename real>
 struct ResidualInfo {
-    real* current_primal_residual = nullptr;
-    real* current_dual_residual   = nullptr;
-    real  current_gap             = std::numeric_limits<real>::max();
-    real* avg_primal_residual     = nullptr;
-    real* avg_dual_residual       = nullptr;
-    real  avg_gap                 = std::numeric_limits<real>::max();
-    real* last_primal_residual    = nullptr;
-    real* last_dual_residual      = nullptr;
-    real  last_gap                = std::numeric_limits<real>::max();
+    real primal_residual = static_cast<real>(1.0);
+    real dual_residual   = static_cast<real>(1.0);
+    real best_primal_residual = static_cast<real>(1.0);
+    real best_dual_residual   = static_cast<real>(1.0);
+    real avg_primal_residual = static_cast<real>(1.0);
+    real avg_dual_residual   = static_cast<real>(1.0);
+    real residual = static_cast<real>(1.0);
+    real avg_residual = static_cast<real>(1.0);
+};
+
+template <typename real>
+struct RestartInfo {
+    real* last_restart_primal_solution = nullptr;
+    real* last_restart_dual_solution   = nullptr;
+    real last_residual = static_cast<real>(1.0);
+    real last_restart_residual = static_cast<real>(1.0);
+    int restart_count = 0;
+    real restart_primal_distant = static_cast<real>(1.0);
+    real restart_dual_distant   = static_cast<real>(1.0);
+    int interval_iterations = 0;
 };
 
 template <typename real>
 struct BufferState {
+    real* obj_tmp           = nullptr;
     real* utility            = nullptr;
     real* dual_product       = nullptr;
     real* current_primal_sum = nullptr;
@@ -49,8 +66,11 @@ struct PdhgOptions {
     int  verbose_frequency       = 100;
     int  max_outer_iterations    = 10'000;
     int  max_inner_iterations    = 200;
+    int  max_traceback_times     = 20;
     real primal_weight           = real{1};
     real step_size               = real{1};
+    real tol                     = static_cast<real>(1e-6);
+    real primal_weight_update_smoothing = static_cast<real>(0.2);
 };
 
 template <typename real>

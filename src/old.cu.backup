@@ -33,17 +33,17 @@ __global__ void fill_rand(curandState* state, double* data, int nnz) {
     }
 }
 
-// 生成 [0, n-1] 范围内的随机整数
-__global__ void generate_random_integers(curandState* state, int* col_ind, int nnz, int n) {
+// 生成 [0, col-1] 范围内的随机整数
+__global__ void generate_random_integers(curandState* state, int* col_ind, int nnz, int col) {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if (idx < nnz) {
-        col_ind[idx] = static_cast<int>(curand_uniform_double(&state[idx]) * n);
+        col_ind[idx] = static_cast<int>(curand_uniform_double(&state[idx]) * col);
     }
 }
 
-__global__ void unique_columns(int* col_ind, int* row_ptr, int m, int n) {
+__global__ void unique_columns(int* col_ind, int* row_ptr, int row, int col) {
     int row = blockIdx.x;
-    if (row >= m) return;
+    if (row >= row) return;
 
     int start = row_ptr[row];
     int end = row_ptr[row + 1];
@@ -81,9 +81,9 @@ __global__ void unique_columns(int* col_ind, int* row_ptr, int m, int n) {
     }
 }
 // 计算 u_sum_dim_1 和 vec_val
-__global__ void compute_u_sum_dim_1_and_vec_val(double* u_val, int* row_ptr, double* b, double* u_sum_dim_1, double* vec_val, int m) {
+__global__ void compute_u_sum_dim_1_and_vec_val(double* u_val, int* row_ptr, double* b, double* u_sum_dim_1, double* vec_val, int row) {
     int row = blockIdx.x;
-    if (row >= m) return;
+    if (row >= row) return;
 
     int start = row_ptr[row];
     int end = row_ptr[row + 1];
@@ -96,9 +96,9 @@ __global__ void compute_u_sum_dim_1_and_vec_val(double* u_val, int* row_ptr, dou
 }
 
 // 计算 x0
-__global__ void compute_x0(double* u_val, int* row_ptr, double* vec_val, double* x0, int m) {
+__global__ void compute_x0(double* u_val, int* row_ptr, double* vec_val, double* x0, int row) {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    if (idx >= m) return;
+    if (idx >= row) return;
 
     int row = idx;
     int start = row_ptr[row];
@@ -108,19 +108,19 @@ __global__ void compute_x0(double* u_val, int* row_ptr, double* vec_val, double*
     }
 }
 
-void generate_problem_gpu(int m, int n, int nnz, FisherProblem &csr, double power = 1.0) {
+void generate_problem_gpu(int row, int col, int nnz, FisherProblem &csr, double power = 1.0) {
     // 1. 分配设备内存
     cudaMalloc(&csr.x0,     nnz * sizeof(double));
     cudaMalloc(&csr.w,      nnz * sizeof(double));
     cudaMalloc(&csr.u_val,  nnz * sizeof(double));
-    cudaMalloc(&csr.b,      m   * sizeof(double));
+    cudaMalloc(&csr.b,      row   * sizeof(double));
     cudaMalloc(&csr.col_ind, nnz * sizeof(int));
-    cudaMalloc(&csr.row_ptr, (m+1) * sizeof(int));
+    cudaMalloc(&csr.row_ptr, (row+1) * sizeof(int));
     cudaMalloc(&csr.bounds, 3 * nnz * sizeof(double));
     double* d_u_sum_dim_1;
     double* d_vec_val;
-    cudaMalloc(&d_u_sum_dim_1, m * sizeof(double));
-    cudaMalloc(&d_vec_val, m * sizeof(double));
+    cudaMalloc(&d_u_sum_dim_1, row * sizeof(double));
+    cudaMalloc(&d_vec_val, row * sizeof(double));
     csr.power = power;
     
         // 2. 随机数状态
@@ -140,26 +140,26 @@ void generate_problem_gpu(int m, int n, int nnz, FisherProblem &csr, double powe
     // }
     // delete[] h_u_val;
 
-    // 4. 构造 row_ptr：每行 nnz/m 个非零（动态分配）
-    int min_per_row = nnz / m;
-    int extra = nnz - min_per_row * m;
-    std::vector<int> h_row_ptr(m + 1);
+    // 4. 构造 row_ptr：每行 nnz/row 个非零（动态分配）
+    int min_per_row = nnz / row;
+    int extra = nnz - min_per_row * row;
+    std::vector<int> h_row_ptr(row + 1);
     h_row_ptr[0] = 0;
-    for (int i = 1; i <= m; ++i) {
+    for (int i = 1; i <= row; ++i) {
         h_row_ptr[i] = h_row_ptr[i - 1] + min_per_row + (i <= extra ? 1 : 0);
     }
-    cudaMemcpy(csr.row_ptr, h_row_ptr.data(), (m + 1) * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(csr.row_ptr, h_row_ptr.data(), (row + 1) * sizeof(int), cudaMemcpyHostToDevice);
 
-    // 5. 构造 col_ind：生成 [0, n-1] 范围内的随机整数
-    generate_random_integers<<<(nnz+255)/256, 256>>>(d_state, csr.col_ind, nnz, n);
+    // 5. 构造 col_ind：生成 [0, col-1] 范围内的随机整数
+    generate_random_integers<<<(nnz+255)/256, 256>>>(d_state, csr.col_ind, nnz, col);
 
     // 6. 确保每行的列索引是唯一的
-    unique_columns<<<(m+255)/256, 256>>>(csr.col_ind, csr.row_ptr, m, n);
+    unique_columns<<<(row+255)/256, 256>>>(csr.col_ind, csr.row_ptr, row, col);
 
     // 7. 生成 b：随机
-    double* h_b = new double[m];
-    std::fill(h_b, h_b + m, 0.25 * m);
-    cudaMemcpy(csr.b, h_b, m * sizeof(double), cudaMemcpyHostToDevice);
+    double* h_b = new double[row];
+    std::fill(h_b, h_b + row, 0.25 * row);
+    cudaMemcpy(csr.b, h_b, row * sizeof(double), cudaMemcpyHostToDevice);
     delete[] h_b;
 
     // 8. 构造 bounds：三行 [nbd; lb; ub]
@@ -171,26 +171,26 @@ void generate_problem_gpu(int m, int n, int nnz, FisherProblem &csr, double powe
     delete[] h_bounds;
 
     // 9. 计算 u_sum_dim_1 和 vec_val
-    compute_u_sum_dim_1_and_vec_val<<<(m+255)/256, 256>>>(csr.u_val, csr.row_ptr, csr.b, d_u_sum_dim_1, d_vec_val, m);
+    compute_u_sum_dim_1_and_vec_val<<<(row+255)/256, 256>>>(csr.u_val, csr.row_ptr, csr.b, d_u_sum_dim_1, d_vec_val, row);
 //     // 检查 u_sum_dim_1 的值
-    double* h_u_sum_dim_1 = new double[m];
-    cudaMemcpy(h_u_sum_dim_1, d_u_sum_dim_1, m * sizeof(double), cudaMemcpyDeviceToHost);
-    for (int i = 0; i < m; ++i) {
+    double* h_u_sum_dim_1 = new double[row];
+    cudaMemcpy(h_u_sum_dim_1, d_u_sum_dim_1, row * sizeof(double), cudaMemcpyDeviceToHost);
+    for (int i = 0; i < row; ++i) {
         printf("u_sum_dim_1[%d] = %f\n", i, h_u_sum_dim_1[i]);
     }
     delete[] h_u_sum_dim_1;
 
     // 检查 vec_val 的值
-    double* h_vec_val = new double[m];
-    cudaMemcpy(h_vec_val, d_vec_val, m * sizeof(double), cudaMemcpyDeviceToHost);
-    for (int i = 0; i < m; ++i) {
+    double* h_vec_val = new double[row];
+    cudaMemcpy(h_vec_val, d_vec_val, row * sizeof(double), cudaMemcpyDeviceToHost);
+    for (int i = 0; i < row; ++i) {
         printf("vec_val[%d] = %f\n", i, h_vec_val[i]);
     }
     delete[] h_vec_val;
 
-    double* h_b1 = new double[m];
-    cudaMemcpy(h_b1, csr.b, m * sizeof(double), cudaMemcpyDeviceToHost);
-    for (int i = 0; i < m; ++i) {
+    double* h_b1 = new double[row];
+    cudaMemcpy(h_b1, csr.b, row * sizeof(double), cudaMemcpyDeviceToHost);
+    for (int i = 0; i < row; ++i) {
         printf("b[%d] = %f\n", i, h_b[i]);
     }
     delete[] h_b1;
@@ -207,12 +207,12 @@ void generate_problem_gpu(int m, int n, int nnz, FisherProblem &csr, double powe
 #include "fisher_problem.h"
 #include "fisher_func.h"
 int main() {
-    const int m_dim = 100;
-    const int n_dim = 100;
+    const int row_dim = 100;
+    const int col_dim = 100;
     const int nnz   = 10000;
 
     FisherProblem csr;
-    generate_problem_gpu(m_dim, n_dim, nnz, csr, 1.0);
+    generate_problem_gpu(row_dim, col_dim, nnz, csr, 1.0);
 
     double *h_x0 = new double[nnz];
     cudaMemcpy(h_x0, csr.x0, nnz*sizeof(double), cudaMemcpyDeviceToHost);
@@ -220,24 +220,24 @@ int main() {
     for (int i = 0; i <5; ++i) std::cout << h_x0[i] << " ";
     std::cout << "\n";
     
-    double *utility = new double[m_dim];
+    double *utility = new double[row_dim];
     double *d_utility;
-    cudaMalloc(&d_utility, m_dim * sizeof(double));
+    cudaMalloc(&d_utility, row_dim * sizeof(double));
     double *p;
-    cudaMalloc(&p, n_dim * sizeof(double));
+    cudaMalloc(&p, col_dim * sizeof(double));
     double *tmp_objective;
-    cudaMalloc(&tmp_objective, m_dim * sizeof(double));
+    cudaMalloc(&tmp_objective, row_dim * sizeof(double));
     launch_utility_csr<double>(
-        m_dim, csr.x0, csr.u_val, csr.row_ptr, d_utility, csr.power);
+        row_dim, csr.x0, csr.u_val, csr.row_ptr, d_utility, csr.power);
     launch_objective_csr<double>(
-        m_dim, csr.x0, csr.u_val, csr.w, csr.row_ptr, csr.col_ind, 
+        row_dim, csr.x0, csr.u_val, csr.w, csr.row_ptr, csr.col_ind, 
         csr.power, tmp_objective, p, 1.0, csr.x0);
-    double *h_objective = new double[m_dim];
-    cudaMemcpy(h_objective, tmp_objective, m_dim * sizeof(double), cudaMemcpyDeviceToHost);
+    double *h_objective = new double[row_dim];
+    cudaMemcpy(h_objective, tmp_objective, row_dim * sizeof(double), cudaMemcpyDeviceToHost);
     std::cout << "Objective function launched successfully.\n";
     std::cout << "Objective function value: "<< h_objective[0] << "\n";
-    double *h_utility = new double[m_dim];
-    cudaMemcpy(h_utility, d_utility, m_dim * sizeof(double), cudaMemcpyDeviceToHost);
+    double *h_utility = new double[row_dim];
+    cudaMemcpy(h_utility, d_utility, row_dim * sizeof(double), cudaMemcpyDeviceToHost);
     std::cout << "First 5 utility: ";
     for (int i = 0; i < 100; ++i) std::cout << h_utility[i] << " ";
     std::cout << "\n";
