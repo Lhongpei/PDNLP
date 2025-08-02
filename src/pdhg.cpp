@@ -37,7 +37,7 @@ LBFGSB_CUDA_SUMMARY<real> lbfgsb_cuda_primal(
     lbfgsbcuda::lbfgsbdefaultoption<real>(lbfgsb_options);
     lbfgsb_options.mode = LCM_CUDA;
     lbfgsb_options.eps_f = static_cast<real>(1e-50);
-    lbfgsb_options.eps_g = static_cast<real>(1e-20);
+    lbfgsb_options.eps_g = static_cast<real>(1e-6);
     lbfgsb_options.eps_x = static_cast<real>(1e-50);
     lbfgsb_options.max_iteration = 1;
 
@@ -372,10 +372,10 @@ PdhgLog<real> adaptive_pdhg_fisher(
 }
 int main() {
     FisherProblem problem;
-    int row_dim = 1000000;
-    int col_dim = 200000;
-    int nnz = 8000000;
-    generate_problem_gpu(row_dim, col_dim ,nnz, problem, 0.3, static_cast<double>(col_dim) * 0.5);
+    int row_dim = 10000;
+    int col_dim = 2000;
+    int nnz = 80000;
+    generate_problem_gpu(row_dim, col_dim ,nnz, problem, 0.3, static_cast<double>(col_dim) * 0.05);
     // print_fisher_problem(problem);
     PdhgOptions<double> options;
     options.max_outer_iterations = 20000;
