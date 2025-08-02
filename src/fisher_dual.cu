@@ -13,7 +13,7 @@ __global__ void fisher_dual_kernel(
 ){
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < col) {
-        dual_solution[idx] = last_dual_solution[idx] + sigma * (primal_sum[idx]  - right_hand_side[idx]);
+        dual_solution[idx] = last_dual_solution[idx] + sigma * (2 * primal_sum[idx] - last_primal_sum[idx] - right_hand_side[idx]);
         // printf("Check all components: dual_solution[%d] = %f, last_dual_solution[%d] = %f, primal_sum[%d] = %f, last_primal_sum[%d] = %f, right_hand_side[%d] = %f\n",
         //        idx, dual_solution[idx], idx, last_dual_solution[idx], idx, primal_sum[idx], idx, last_primal_sum[idx], idx, right_hand_side[idx]);
     }

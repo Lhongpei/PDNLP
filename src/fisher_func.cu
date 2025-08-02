@@ -281,7 +281,7 @@ void launch_objective_csr(
     }
     cudaMemcpy(&obj, d_objective, sizeof(real), cudaMemcpyDeviceToHost);
     //=============Calculate Part. 2 \sum_{j=1}^{m} p_j (\sum_{i=1}^{n} x_{ij}) - 1)
-    csr_column_sum(nnz, x_sum, d_x_val, d_col_indice);
+    csr_column_sum(nnz, col, x_sum, d_x_val, d_col_indice);
     int gridSize2 = (col + blockSize - 1) / blockSize;
     real* obj2 = nullptr;
     cudaMallocManaged(&obj2, sizeof(real));

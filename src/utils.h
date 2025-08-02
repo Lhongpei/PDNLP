@@ -7,10 +7,16 @@ void fill(
     real* dst,
     const real value,
     const int size);
-
+template <typename real>
+void element_a_minus_b(
+    const int N,
+    real* dst,
+    const real* a,
+    const real* b);
 template <typename real>
 void csr_column_sum(
     const int nnz,
+    const int col_dim,
     real* dst,
     const real *values,
     const int *col_idx

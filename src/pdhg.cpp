@@ -37,9 +37,9 @@ LBFGSB_CUDA_SUMMARY<real> lbfgsb_cuda_primal(
     lbfgsbcuda::lbfgsbdefaultoption<real>(lbfgsb_options);
     lbfgsb_options.mode = LCM_CUDA;
     lbfgsb_options.eps_f = static_cast<real>(1e-50);
-    lbfgsb_options.eps_g = static_cast<real>(1e-6);
+    lbfgsb_options.eps_g = static_cast<real>(1e-20);
     lbfgsb_options.eps_x = static_cast<real>(1e-50);
-    lbfgsb_options.max_iteration = 100;
+    lbfgsb_options.max_iteration = 1;
 
     // initialize LBFGSB state
     LBFGSB_CUDA_STATE<real> state;
@@ -86,6 +86,7 @@ LBFGSB_CUDA_SUMMARY<real> lbfgsb_cuda_primal(
         
         d_gradient = g;
         minimal_f = fmin(minimal_f, f);
+        // print_cuarray("solution", x, nnz);
         // printf("Function value: %f, Minimal function value: %f\n", f, minimal_f);
         return 0;
     };
@@ -98,8 +99,8 @@ LBFGSB_CUDA_SUMMARY<real> lbfgsb_cuda_primal(
     cudaMalloc(&nbd, nnz * sizeof(int));
 
 
-    fill(nbd, 0, nnz);
-    fill(xl, 1e-12, nnz);
+    fill(nbd, 1, nnz);
+    fill(xl, 1e-3, nnz);
     fill(xu, 1.0 , nnz);
     // cudaMemcpy(d_x_val, xl, nnz * sizeof(real), cudaMemcpyDeviceToDevice);
     LBFGSB_CUDA_SUMMARY<real> summary;
@@ -147,7 +148,7 @@ PdhgLog<real> adaptive_pdhg_fisher(
     BufferState<real> buffer;
     RestartInfo<real> restart_info;
     //TODO Delete this line after testing
-    fill(problem.b, 1.0, col_dim);
+    // fill(problem.b, 1.0, col_dim);
     cudaMalloc(&buffer.obj_tmp, row_dim * sizeof(real));
     cudaMalloc(&state.current_primal_solution, nnz * sizeof(real));
     cudaMemcpy(state.current_primal_solution, problem.x0, nnz * sizeof(real), cudaMemcpyDeviceToDevice);
@@ -168,19 +169,28 @@ PdhgLog<real> adaptive_pdhg_fisher(
     cudaMalloc(&buffer.current_primal_sum, col_dim * sizeof(real));
     cudaMalloc(&buffer.last_primal_sum, col_dim * sizeof(real));
     cudaMalloc(&buffer.avg_primal_sum, col_dim * sizeof(real));
-    csr_column_sum(nnz, buffer.current_primal_sum, state.current_primal_solution, problem.col_ind);
+    csr_column_sum(nnz, col_dim, buffer.current_primal_sum, state.current_primal_solution, problem.col_ind);
     cudaMemcpy(buffer.last_primal_sum, buffer.current_primal_sum, col_dim * sizeof(real), cudaMemcpyDeviceToDevice);
     cudaMemcpy(buffer.avg_primal_sum, buffer.current_primal_sum, col_dim * sizeof(real), cudaMemcpyDeviceToDevice);
     cudaMalloc(&restart_info.last_restart_primal_solution, nnz * sizeof(real));
     cudaMemcpy(restart_info.last_restart_primal_solution, state.current_primal_solution, nnz * sizeof(real), cudaMemcpyDeviceToDevice);
     cudaMalloc(&restart_info.last_restart_dual_solution, col_dim * sizeof(real));
     cudaMemcpy(restart_info.last_restart_dual_solution, state.current_dual_solution, col_dim * sizeof(real), cudaMemcpyDeviceToDevice);
+    real *cache_delta_primal = nullptr;
+    real *cache_delta_dual = nullptr;
+    real *cache_delta_primal_sum = nullptr;
+    cudaMalloc(&cache_delta_primal, nnz * sizeof(real));
+    cudaMalloc(&cache_delta_dual, col_dim * sizeof(real));
+    cudaMalloc(&cache_delta_primal_sum, col_dim * sizeof(real));
     cublasHandle_t cublas_handle;
+    cublasCreate(&cublas_handle);
     state.step_size = 2.0 / sqrt(static_cast<real>(row_dim));
     state.primal_weight = sqrt(static_cast<real>(col_dim)) / static_cast<real>(row_dim);
     bool restart = false;
     double obj;
     CUDA_CHECK(cudaGetLastError());
+    //Start Calculation of time
+    auto start_time = std::chrono::steady_clock::now();
     while (true){
         // state.outer_solving_time = 0.0f;
         // state.inner_solving_time = 0.0f;
@@ -200,23 +210,37 @@ PdhgLog<real> adaptive_pdhg_fisher(
             cudaDeviceSynchronize();
             double primal_step_size_inner = primal_step_size;
             LBFGSB_CUDA_SUMMARY<real> summary;
-            
             summary = lbfgsb_cuda_primal(
             row_dim, col_dim, nnz,
             state.current_primal_solution, problem.u_val, problem.w,
             problem.row_ptr, problem.col_ind, problem.power,
             state.current_dual_solution, problem.b, primal_step_size_inner,
             state.last_primal_solution, buffer.utility, state.primal_gradient, buffer.obj_tmp, buffer.current_primal_sum, false);
-
                
             log.num_inner_iterations += summary.num_iteration;
             launch_utility_csr(row_dim, state.current_primal_solution, problem.u_val, problem.row_ptr, buffer.utility, problem.power);
             dual_update(col_dim, state.current_dual_solution, state.last_dual_solution, buffer.current_primal_sum, buffer.last_primal_sum, problem.b,  dual_step_size);
+            if (options.debug) {
+                // print_cuarray("current primal solution", state.current_primal_solution, nnz);
+                
+                print_cuarray("utility", buffer.utility, row_dim);
+                
+            }
+            // std::cout << "Step size: " << state.step_size << ", Primal weight: " << state.primal_weight << std::endl;
+            // std::cout << "Primal step size: " << primal_step_size_inner << ", Dual step size: " << dual_step_size << std::endl;
+            // print_cuarray("current primal sum", buffer.current_primal_sum, col_dim);
+            // print_cuarray("current dual solution", state.current_dual_solution, col_dim);
+            // print_cuarray("last dual solution", state.last_dual_solution, col_dim);
+            // print_cuarray("current primal solution", state.current_primal_solution, nnz);
+            // print_cuarray("last primal solution", state.last_primal_solution, nnz);
+            
             std::tuple<real, real> interaction_movement = compute_interaction_and_movement(
-                        col_dim, nnz, state.current_primal_solution, state.last_primal_solution, state.current_dual_solution, 
-                        state.last_dual_solution, buffer.current_primal_sum, buffer.last_primal_sum, cublas_handle);
+                        col_dim, nnz, state.primal_weight, state.current_primal_solution, state.last_primal_solution, state.current_dual_solution, 
+                        state.last_dual_solution, buffer.current_primal_sum, buffer.last_primal_sum, cache_delta_primal, cache_delta_dual, cache_delta_primal_sum, cublas_handle);
+                        
             real interaction = std::get<0>(interaction_movement);
             real movement = std::get<1>(interaction_movement);
+            // std::cout<<"interaction" << interaction << ", movement" << movement << std::endl;
             real step_size_limit = INFINITY;
             if (interaction > 0.0){
                 step_size_limit = movement / interaction;
@@ -225,13 +249,18 @@ PdhgLog<real> adaptive_pdhg_fisher(
                     break;
                 }
             }
+            
+            real first_term = (1.0 - 1.0 / pow((restart_info.interval_iterations + 1 ), 0.3)) * step_size_limit;
+            real second_term = (1.0 + 1.0 / pow((restart_info.interval_iterations + 1), 0.6)) * state.step_size;
+            
+            state.step_size = fmin(first_term, second_term);
+            // std::cout<< "Step size limit: " << step_size_limit 
+            //          << ", First term: " << first_term 
+            //          << ", Second term: " << second_term << ", New step size: " << state.step_size << std::endl;
+            state.step_size = fmin(fmax(state.step_size, 0.01 / sqrt(static_cast<real>(row_dim) + static_cast<real>(col_dim))), 0.2 / sqrt(static_cast<real>(row_dim) + static_cast<real>(col_dim)));
             if (state.step_size <= step_size_limit) {
                 break;
             }
-            real first_term = (1.0 - 1.0 / pow((restart_info.interval_iterations + 1 ), 0.3)) * step_size_limit;
-            real second_term = (1.0 + 1.0 / pow((restart_info.interval_iterations + 1), 0.6)) * state.step_size;
-            state.step_size = fmin(first_term, second_term);
-            state.step_size = fmin(fmax(state.step_size, 0.01 / sqrt(static_cast<real>(row_dim) + static_cast<real>(col_dim))), 0.2 / sqrt(static_cast<real>(row_dim) + static_cast<real>(col_dim)));
         }
         
         // print_cuarray("Current primal solution: ", state.current_primal_solution, nnz);
@@ -239,11 +268,16 @@ PdhgLog<real> adaptive_pdhg_fisher(
 
 
         //=========================Update Average Solutions=========================
-        real weight = 1/ (1 + restart_info.interval_iterations);
+        real weight = 1. / (1. +  static_cast<real>(restart_info.interval_iterations));
+        
         weighted_self_add_diff(nnz, state.avg_primal_solution, state.current_primal_solution, weight);
         weighted_self_add_diff(col_dim, state.avg_dual_solution, state.current_dual_solution, weight);
+        cudaDeviceSynchronize();
         weighted_self_add_diff(col_dim, buffer.avg_primal_sum, buffer.current_primal_sum, weight);
-
+        // print_cuarray("avg primal sum", buffer.avg_primal_sum, col_dim);
+        // print_cuarray("current primal sum", buffer.current_primal_sum, col_dim);
+        // printf("interval iterations: %d", restart_info.interval_iterations);
+        // printf("weight: %f, step size: %f, primal weight: %f\n", weight, state.step_size, state.primal_weight);
         
         if (state.num_outer_iterations % options.check_frequency == 0) 
         {
@@ -283,21 +317,26 @@ PdhgLog<real> adaptive_pdhg_fisher(
             restart_info.last_residual = better_residual;
             if (restart && state.num_outer_iterations > options.restart_skip_iterations) {
                 restart_info.restart_count += 1;
+                printf("Current Residual: %f, Average Residual: %f", 
+                    residual_info.residual, residual_info.avg_residual);
                 printf("Restarting at outer iteration %d, restart count: %d\n", state.num_outer_iterations, restart_info.restart_count);
                 if (residual_info.residual < residual_info.avg_residual) {
                     cudaMemcpy(state.avg_dual_solution, state.current_dual_solution, col_dim * sizeof(real), cudaMemcpyDeviceToDevice);
                     cudaMemcpy(state.avg_primal_solution, state.current_primal_solution, nnz * sizeof(real), cudaMemcpyDeviceToDevice);
+                    cudaMemcpy(buffer.avg_primal_sum, buffer.current_primal_sum, col_dim * sizeof(real), cudaMemcpyDeviceToDevice);
+                    
                     restart_info.last_restart_residual = residual_info.residual;
                 }
                 else{
                     cudaMemcpy(state.current_primal_solution, state.avg_primal_solution, nnz * sizeof(real), cudaMemcpyDeviceToDevice);
                     cudaMemcpy(state.current_dual_solution, state.avg_dual_solution, col_dim * sizeof(real), cudaMemcpyDeviceToDevice);
+                    cudaMemcpy(buffer.current_primal_sum, buffer.avg_primal_sum, col_dim * sizeof(real), cudaMemcpyDeviceToDevice);
                     restart_info.last_restart_residual = residual_info.avg_residual;
                 }
                 restart_info.interval_iterations = 0;
             }
             
-            //========================Update Step Size and Primal Weight=========================
+            //========================Update Primal Weight=========================
             restart_info.restart_primal_distant = globalDiffReduce(restart_info.last_restart_primal_solution, state.current_primal_solution, nnz, OP_MAX, true);
             restart_info.restart_dual_distant = globalDiffReduce(restart_info.last_restart_dual_solution, state.current_dual_solution, col_dim, OP_MAX, true);
 
@@ -307,10 +346,13 @@ PdhgLog<real> adaptive_pdhg_fisher(
             state.primal_weight = compute_new_primal_weight(
                 restart_info.restart_primal_distant, restart_info.restart_dual_distant, state.primal_weight, options.primal_weight_update_smoothing);
 
-                
+            if (state.primal_weight < 1e-4 || state.primal_weight > 0.5){
+                state.primal_weight = sqrt((static_cast<real>(col_dim)/static_cast<real>(row_dim)));
+            }
             //========================Print Residuals and Gap=========================
             printf("Outer iteration %d, Inner iteration %d, Primal residual: %f, Dual residual: %f, Gap: %f\n",
                 state.num_outer_iterations, log.num_inner_iterations, residual_info.primal_residual, residual_info.dual_residual, gap);
+            std::cout << "step size: " << state.step_size << ", primal weight: " << state.primal_weight << std::endl;
         }
 
         //========================Check Stop Conditions=========================
@@ -324,21 +366,24 @@ PdhgLog<real> adaptive_pdhg_fisher(
        }
     }
     log.num_outer_iterations = state.num_outer_iterations;
+    auto end_time = std::chrono::steady_clock::now();
+    log.outer_solving_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() / 1000.0f;
     return log;
 }
 int main() {
     FisherProblem problem;
-    int row_dim = 800;
-    int col_dim = 200;
-    int nnz = 10000;
-    generate_problem_gpu(row_dim, col_dim ,nnz, problem, 0.2, static_cast<double>(col_dim) * 0.1);
+    int row_dim = 1000000;
+    int col_dim = 200000;
+    int nnz = 8000000;
+    generate_problem_gpu(row_dim, col_dim ,nnz, problem, 0.3, static_cast<double>(col_dim) * 0.5);
     // print_fisher_problem(problem);
     PdhgOptions<double> options;
-    options.max_outer_iterations = 200000;
+    options.max_outer_iterations = 20000;
     options.max_inner_iterations = 100;
     options.check_frequency = 120;
     options.verbose_frequency = 100;
     options.tol =  1e-4;
+    options.debug = false;
     CUDA_CHECK(cudaGetLastError());
     PdhgLog<double> log = adaptive_pdhg_fisher(problem, options);
 
@@ -354,6 +399,7 @@ int main() {
     cudaFree(problem.col_ind);
     cudaFree(problem.row_ptr);
     cudaFree(problem.bounds);
-
+    printf("Solving time: %.2f seconds\n", log.outer_solving_time);
+    printf("Iterations: %d\n", log.num_outer_iterations);
     return 0;
 }

@@ -238,7 +238,7 @@ for (int i = 0; i < row; ++i) {
     fill(csr.b, b_value, col);
     double *u_sum = nullptr;
     cudaMalloc(&u_sum, col * sizeof(double));
-    csr_column_sum(nnz, u_sum, csr.u_val, csr.col_ind);
+    csr_column_sum(nnz, col, u_sum, csr.u_val, csr.col_ind);
     print_cuarray("u_sum", u_sum, col);
     self_div(col, u_sum, csr.b);
     compute_x0<<<(nnz + 255) / 256, 256>>>(csr.u_val, csr.col_ind, u_sum, csr.x0, nnz);

@@ -71,6 +71,7 @@ struct PdhgOptions {
     real step_size               = real{1};
     real tol                     = static_cast<real>(1e-6);
     real primal_weight_update_smoothing = static_cast<real>(0.2);
+    bool debug                  = false;
 };
 
 template <typename real>

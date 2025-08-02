@@ -105,23 +105,24 @@ __global__ void csr_column_sum_kernel(
 template <typename real>
 void csr_column_sum(
     const int nnz,
+    const int col_dim,
     real *dst,
     const real *values,
     const int *col_idx)
 {
     constexpr int blockSize = BLOCK_SIZE;
     int gridSize = (nnz + blockSize - 1) / blockSize;
-    fill<real>(dst, 0.0, nnz);
+    fill<real>(dst, 0.0, col_dim);
     csr_column_sum_kernel<real><<<gridSize, blockSize>>>(nnz, dst, values, col_idx);
     cudaDeviceSynchronize();
 }
 
 template void csr_column_sum<double>(
-    const int, double *, const double *, const int *);
+    const int, const int, double *, const double *, const int *);
 // template void csr_column_sum<float>(
 //     const int, float *, const float *, const int *);
 template void csr_column_sum<int>(
-    const int, int *, const int *, const int *);
+    const int, const int, int *, const int *, const int *);
 
 template <typename real>
 __global__ void weighted_self_add_kernel(
@@ -150,6 +151,35 @@ void weighted_self_add(
 }
 
 template void weighted_self_add<double>(const int, double*, const double*, const double);
+
+
+template <typename real>
+__global__ void element_a_minus_b_kernel(
+    const int N,
+    real* dst,
+    const real* a,
+    const real* b)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < N) {
+        dst[idx] = a[idx] - b[idx];
+    }
+}
+template <typename real>
+void element_a_minus_b(
+    const int N,
+    real* dst,
+    const real* a,
+    const real* b)
+{
+    constexpr int blockSize = BLOCK_SIZE;
+    int gridSize = (N + blockSize - 1) / blockSize;
+    element_a_minus_b_kernel<real><<<gridSize, blockSize>>>(N, dst, a, b);
+    cudaDeviceSynchronize();
+}
+
+template void element_a_minus_b<double>(
+    const int N, double* dst, const double* a, const double* b);
 
 template <typename real>
 __global__ void weighted_self_add_diff_kernel(

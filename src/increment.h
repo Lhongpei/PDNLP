@@ -3,12 +3,16 @@ template <typename real>
 std::tuple<real, real> compute_interaction_and_movement(
     int        col,
     int        nnz,
+    real       primal_weight,
     real*      d_current_primal_solution,
     real*      d_last_primal_solution,
     real*      d_current_dual_solution,
     real*      d_last_dual_solution,
     real*      d_current_primal_sum,
     real*      d_last_primal_sum,
+    real*      d_delta_primal,
+    real*      d_delta_dual,
+    real*      d_delta_primal_sum,
     cublasHandle_t handle);
 
 template<typename real>

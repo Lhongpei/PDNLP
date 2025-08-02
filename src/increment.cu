@@ -10,63 +10,72 @@
 #include <printf.h>
 #include <iostream>
 #include "const.h"
+#include <assert.h>
 template <typename real>
 std::tuple<real, real> compute_interaction_and_movement(
     int        col,
     int        nnz,
+    real       primal_weight,
     real*      d_current_primal_solution,
     real*      d_last_primal_solution,
     real*      d_current_dual_solution,
     real*      d_last_dual_solution,
     real*      d_current_primal_sum,
     real*      d_last_primal_sum,
+    real*      cache_delta_primal,
+    real*      cache_delta_dual,
+    real*      cache_delta_primal_sum,
     cublasHandle_t handle)
 {
-    // 1. 临时向量 delta_primal, delta_dual
-    real *d_delta_primal, *d_delta_dual;
-    cudaMalloc(&d_delta_primal, col * sizeof(real));
-    cudaMalloc(&d_delta_dual,   col * sizeof(real));
+    element_a_minus_b(nnz, cache_delta_primal, d_current_primal_solution, d_last_primal_solution);
+    element_a_minus_b(col, cache_delta_dual, d_current_dual_solution, d_last_dual_solution);
+    element_a_minus_b(col, cache_delta_primal_sum, d_current_primal_sum, d_last_primal_sum);
 
-    // delta = current - last
-    real alpha = 1.0, beta = -1.0;
-    cublasDaxpy(handle, col, &alpha, d_current_primal_solution, 1,
-                d_last_primal_solution, 1);
-    cublasDcopy(handle, col, d_current_primal_solution, 1, d_delta_primal, 1);
-    cublasDaxpy(handle, col, &beta, d_last_primal_solution, 1, d_delta_primal, 1);
-
-    cublasDcopy(handle, col, d_current_dual_solution, 1, d_delta_dual, 1);
-    cublasDaxpy(handle, col, &beta, d_last_dual_solution, 1, d_delta_dual, 1);
-
-    // 2. 标量差 (host 计算即可)
-    real cur_sum = 0.0, last_sum = 0.0;
-    cudaMemcpy(&cur_sum,  d_current_primal_sum, sizeof(real), cudaMemcpyDeviceToHost);
-    cudaMemcpy(&last_sum, d_last_primal_sum,    sizeof(real), cudaMemcpyDeviceToHost);
-    real delta_sum = cur_sum - last_sum;
-
-    // 3. interaction = | dot(delta_sum, delta_dual) |
     real interaction = 0.0;
-    cublasDdot(handle, col,
-               d_delta_primal, 1,
-               d_delta_dual,   1,
-               &interaction);
-    interaction = fabs(interaction);
+    real *d_interaction = nullptr;
+    cudaMalloc(&d_interaction, sizeof(real));
+
+    cublasStatus_t status = cublasDdot(handle, col,
+            cache_delta_primal_sum, 1,
+            cache_delta_dual,       1,
+            d_interaction); // Now cuBLAS correctly writes to this host variable
+    //Check for errors
+    if (status != CUBLAS_STATUS_SUCCESS) {
+        std::cerr << "CUBLAS error: " << status << std::endl;
+        //Stop the program immediately
+        cudaFree(d_interaction);
+        throw std::runtime_error("CUBLAS error in cublasDdot");
+    }
+    
+    real h_interaction;
+    cudaMemcpy(&h_interaction, d_interaction, sizeof(real), cudaMemcpyDeviceToHost);
+    cudaFree(d_interaction);
+    interaction = fabs(h_interaction);
 
     // 4. norms
     real norm_dp = 0.0, norm_dd = 0.0;
-    cublasDdot(handle, col, d_delta_primal, 1, d_delta_primal, 1, &norm_dp);
-    cublasDdot(handle, col, d_delta_dual,   1, d_delta_dual,   1, &norm_dd);
-    norm_dp = sqrt(norm_dp);
-    norm_dd = sqrt(norm_dd);
+    real *d_norm_dp = nullptr;
+    real *d_norm_dd = nullptr;
+    cudaMalloc(&d_norm_dp, sizeof(real));
+    cudaMalloc(&d_norm_dd, sizeof(real));
+    cublasDdot(handle, nnz, cache_delta_primal, 1, cache_delta_primal, 1, d_norm_dp);
+    cublasDdot(handle, col, cache_delta_dual,   1, cache_delta_dual,   1, d_norm_dd);
+    real h_norm_dp, h_norm_dd;
+    cudaMemcpy(&h_norm_dp, d_norm_dp, sizeof(real), cudaMemcpyDeviceToHost);
+    cudaMemcpy(&h_norm_dd, d_norm_dd, sizeof(real), cudaMemcpyDeviceToHost);
+    cudaFree(d_norm_dp);
+    cudaFree(d_norm_dd);
+    cudaDeviceSynchronize();
+    // norm_dp = sqrt(norm_dp);
+    // norm_dd = sqrt(norm_dd);
 
     // 5. movement = 0.5*(‖Δp‖² + ‖Δd‖²)
-    real movement = 0.5 * (norm_dp * norm_dp + norm_dd * norm_dd);
+    real movement = 0.5 * (primal_weight *  h_norm_dp + 1.0/ primal_weight * h_norm_dd);
 
-    cudaFree(d_delta_primal);
-    cudaFree(d_delta_dual);
 
     return std::make_tuple(interaction, movement);
 }
-template std::tuple<double, double> compute_interaction_and_movement(int, int, double*, double*, double*, double*, double*, double*, cublasHandle_t);
+template std::tuple<double, double> compute_interaction_and_movement(int, int, double, double*, double*, double*, double*, double*, double*, double*, double*, double*, cublasHandle_t);
 
 template<typename real>
 real cal_feasibility(
@@ -84,9 +93,9 @@ real cal_feasibility(
     if (!relative) return norm;
     real norm_x = cuNorm(x_sum, N, NORM_INF);
     abs_cuda(N, tmp, b);
-    real norm_b = 1.0;
+    real norm_b = cuNorm(b, N, NORM_INF);
     cudaFree(tmp);
-    printf("norm_x = %f, norm_b = %f, norm = %f\n", norm_x, norm_b, norm);
+    // printf("norm_x = %f, norm_b = %f, norm = %f\n", norm_x, norm_b, norm);
     return norm / (1 + std::max(norm_x, norm_b));
 }
 
