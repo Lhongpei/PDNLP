@@ -2,6 +2,10 @@
 #pragma once
 #include <cuda_runtime.h>
 #include <cstdio>
+#include <vector>
+#include <chrono>
+#include <sstream>
+#include <iomanip>
 template <typename real>
 void fill(
     real* dst,
@@ -102,3 +106,8 @@ template <typename real>
 bool detect_inf_nan(
     const real* x,
     int n);
+
+template<typename T>
+std::vector<T> copy_from_device(T* d_ptr, size_t count);
+
+std::string make_time_prefix();

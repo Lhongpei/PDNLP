@@ -10,6 +10,8 @@
 #include "fisher_dual.h"
 #include "increment.h"
 #include "reduction.h"
+#include "json.hpp"
+#include <fstream>
 template <typename real>
 LBFGSB_CUDA_SUMMARY<real> lbfgsb_cuda_primal(
     const int row,
@@ -37,7 +39,7 @@ LBFGSB_CUDA_SUMMARY<real> lbfgsb_cuda_primal(
     lbfgsbcuda::lbfgsbdefaultoption<real>(lbfgsb_options);
     lbfgsb_options.mode = LCM_CUDA;
     lbfgsb_options.eps_f = static_cast<real>(1e-50);
-    lbfgsb_options.eps_g = static_cast<real>(1e-5);
+    lbfgsb_options.eps_g = static_cast<real>(1e-7);
     lbfgsb_options.eps_x = static_cast<real>(1e-50);
     lbfgsb_options.max_iteration = 1;
 
@@ -100,7 +102,7 @@ LBFGSB_CUDA_SUMMARY<real> lbfgsb_cuda_primal(
 
 
     fill(nbd, 1, nnz);
-    fill(xl, 1e-3, nnz);
+    fill(xl, 1e-6, nnz);
     fill(xu, 1.0 , nnz);
     // cudaMemcpy(d_x_val, xl, nnz * sizeof(real), cudaMemcpyDeviceToDevice);
     LBFGSB_CUDA_SUMMARY<real> summary;
@@ -210,14 +212,16 @@ PdhgLog<real> adaptive_pdhg_fisher(
             cudaDeviceSynchronize();
             double primal_step_size_inner = primal_step_size;
             LBFGSB_CUDA_SUMMARY<real> summary;
+            auto start_subproblem_time = std::chrono::steady_clock::now();
             summary = lbfgsb_cuda_primal(
             row_dim, col_dim, nnz,
             state.current_primal_solution, problem.u_val, problem.w,
             problem.row_ptr, problem.col_ind, problem.power,
             state.current_dual_solution, problem.b, primal_step_size_inner,
             state.last_primal_solution, buffer.utility, state.primal_gradient, buffer.obj_tmp, buffer.current_primal_sum, false);
-               
+            auto end_subproblem_time = std::chrono::steady_clock::now();
             log.num_inner_iterations += summary.num_iteration;
+            log.inner_solving_time += std::chrono::duration_cast<std::chrono::milliseconds>(end_subproblem_time - start_subproblem_time).count() / 1000.0f;
             launch_utility_csr(row_dim, state.current_primal_solution, problem.u_val, problem.row_ptr, buffer.utility, problem.power);
             dual_update(col_dim, state.current_dual_solution, state.last_dual_solution, buffer.current_primal_sum, buffer.last_primal_sum, problem.b,  dual_step_size);
             if (options.debug) {
@@ -371,11 +375,13 @@ PdhgLog<real> adaptive_pdhg_fisher(
     return log;
 }
 int main() {
-    FisherProblem problem;
-    int row_dim = 1000;
+    int run_times = 1;
+
+    int row_dim = 10000000;
     int col_dim = 400;
-    int nnz = static_cast<int>(row_dim * col_dim * 0.2);
-    generate_problem_gpu(row_dim, col_dim ,nnz, problem, 0.5, static_cast<double>(col_dim) * 0.05);
+    int nnz = static_cast<int>(row_dim * 0.2 * col_dim);
+    printf("Row dimension: %d, Column dimension: %d, Non-zero elements: %d\n", row_dim, col_dim, nnz);
+    double power = 0.5;
     // print_fisher_problem(problem);
     PdhgOptions<double> options;
     options.max_outer_iterations = 20000;
@@ -385,21 +391,54 @@ int main() {
     options.tol =  1e-4;
     options.debug = false;
     CUDA_CHECK(cudaGetLastError());
-    PdhgLog<double> log = adaptive_pdhg_fisher(problem, options);
 
-    // Output results
-    std::cout << "Number of outer iterations: " << log.num_outer_iterations << std::endl;
-    std::cout << "Number of inner iterations: " << log.num_inner_iterations << std::endl;
-    printf("Problem power: %f\n", problem.power);
-    // Free allocated memory
-    cudaFree(problem.x0);
-    cudaFree(problem.w);
-    cudaFree(problem.u_val);
-    cudaFree(problem.b);
-    cudaFree(problem.col_ind);
-    cudaFree(problem.row_ptr);
-    cudaFree(problem.bounds);
-    printf("Solving time: %.2f seconds\n", log.outer_solving_time);
-    printf("Iterations: %d\n", log.num_outer_iterations);
+    //Save solving time and iterations use a json file
+
+
+
+    for (int i = 0; i < run_times; ++i) {
+        FisherProblem problem;    
+        auto start_generate_time = std::chrono::steady_clock::now();
+        generate_problem_gpu(row_dim, col_dim ,nnz, problem, power, static_cast<double>(col_dim) * 0.25);
+        auto end_generate_time = std::chrono::steady_clock::now();
+        printf("Problem generation time: %.2f seconds\n", 
+            std::chrono::duration_cast<std::chrono::milliseconds>(end_generate_time - start_generate_time).count() / 1000.0f);
+        PdhgLog<double> log = adaptive_pdhg_fisher(problem, options);
+        std::string running_log_dir = std::string(FILE_IO_DIR) + "/log" + "/ces_row_" + std::to_string(row_dim) + "_col_" + std::to_string(col_dim) + "_nnz_" + std::to_string(nnz) + "_" + std::to_string(power);
+        std::filesystem::create_directories(running_log_dir);
+        printf("Problem power: %f\n", problem.power);
+        FisherProblemHost problem_host = to_host(problem);
+        std::string time_prefix = make_time_prefix();
+        save_problem_to_files(problem_host, 
+            std::string(FILE_IO_DIR) + "/problem" + "/ces_row_" + std::to_string(row_dim) + "_col_" + std::to_string(col_dim) + "_nnz_" + std::to_string(nnz) + "_" + std::to_string(problem.power) + "/" + time_prefix, 
+            "fisher_ces");
+        std::string log_file_path = running_log_dir + "/" + time_prefix + ".json";
+        std::cout << "Saving log to: " << log_file_path << std::endl;
+        nlohmann::json log_json;
+        log_json["num_outer_iterations"] = log.num_outer_iterations;
+        log_json["num_inner_iterations"] = log.num_inner_iterations;
+        log_json["outer_solving_time"]   = log.outer_solving_time;
+        log_json["inner_solving_time"]   = log.inner_solving_time;
+
+        std::ofstream ofs(log_file_path);
+        if (ofs.is_open()) {
+            ofs << std::setprecision(6) << std::fixed << log_json.dump(4);
+            ofs.close();
+        } else {
+            std::cerr << "Failed to open log file: " << log_file_path << std::endl;
+        }
+        // Free allocated memory
+        cudaFree(problem.x0);
+        cudaFree(problem.w);
+        cudaFree(problem.u_val);
+        cudaFree(problem.b);
+        cudaFree(problem.col_ind);
+        cudaFree(problem.row_ptr);
+        cudaFree(problem.bounds);
+        printf("Solving time: %.2f seconds\n", log.outer_solving_time);
+        std::cout << "Number of outer iterations: " << log.num_outer_iterations << std::endl;
+        std::cout << "Number of inner iterations: " << log.num_inner_iterations << std::endl;
+        
+    }
     return 0;
 }

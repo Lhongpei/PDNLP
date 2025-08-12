@@ -18,6 +18,8 @@ endif()
 
 include_directories(${CMAKE_SOURCE_DIR}/lib/include)
 include_directories(${CMAKE_SOURCE_DIR}/src)
+# set(FILE_IO_DIR ${CMAKE_SOURCE_DIR}/file_dir)
+
 # link_directories(${CMAKE_SOURCE_DIR}/lib)
 
 add_subdirectory(src)

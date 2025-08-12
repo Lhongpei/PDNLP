@@ -1,19 +1,27 @@
-file(GLOB SRC "./*.cpp" "./*.cu")
-file(GLOB HDR "./*.h")
+
 find_package(CUDAToolkit REQUIRED)
 message(STATUS "CMake is using CUDA Toolkit version: ${CUDAToolkit_VERSION}")
 include_directories(${CMAKE_SOURCE_DIR}/lib/include/culbfgsb)
 include_directories(${CMAKE_SOURCE_DIR}/src)
+include_directories(${CMAKE_SOURCE_DIR}/lib/include/utils)  
+include_directories(${CMAKE_SOURCE_DIR}/cnpy)
 # show all SRC
+file(GLOB SRC "./*.cpp" "./*.cu")
+file(GLOB HDR "./*.h" "./*.hpp")
 message(SRC: ${SRC})
 cuda_add_executable(fisher
   ${HDR}
   ${SRC}
 )
-
+target_compile_definitions(fisher PRIVATE
+  FILE_IO_DIR="${CMAKE_SOURCE_DIR}/file_dir")
 target_link_libraries(fisher 
     ${CMAKE_SOURCE_DIR}/lib/libcuLBFGSB.so 
     CUDA::cublas
+)
+
+target_link_libraries(fisher 
+    ${CMAKE_SOURCE_DIR}/cnpy/build/libcnpy.so
 )
 # # Specify the minimum CMake version
 

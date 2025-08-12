@@ -7,7 +7,9 @@
 #include <thrust/execution_policy.h>
 #include "fisher_problem.h"
 #include "utils.h"
-
+#include "json.hpp"
+#include <fstream>
+#include "cnpy.h"
 // 初始化随机数生成器
 __global__ void setup_rng(curandState* state, unsigned long long seed, int nnz) {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -155,12 +157,24 @@ void build_csr_uniform(int row, int col, int nnz,
     col_ind.shrink_to_fit();
 }
 
+#include <vector>
+#include <numeric>   // For std::iota
+#include <random>    // For std::mt19937, std::random_device
+#include <algorithm> // For std::shuffle, std::sort, std::swap
+#include <iostream>  // For printf/cout
+
+// Assuming FisherProblem struct and other CUDA functions are defined elsewhere
+// struct FisherProblem { ... };
+// void uniform_rand_fill(...);
+// ... etc.
+
 void generate_problem_gpu(int row, int col, int nnz, FisherProblem &csr, double power, double b_value) {
     // 1. 设备内存分配（不变）
+    // This section remains the same as your original code.
     cudaMalloc(&csr.x0,      nnz * sizeof(double));
     cudaMalloc(&csr.w,       row * sizeof(double));
     cudaMalloc(&csr.u_val,   nnz * sizeof(double));
-    cudaMalloc(&csr.b,       col   * sizeof(double));
+    cudaMalloc(&csr.b,       col * sizeof(double));
     cudaMalloc(&csr.col_ind, nnz * sizeof(int));
     cudaMalloc(&csr.row_ptr, (row + 1) * sizeof(int));
     cudaMalloc(&csr.bounds,  3 * nnz * sizeof(double));
@@ -174,79 +188,124 @@ void generate_problem_gpu(int row, int col, int nnz, FisherProblem &csr, double 
     csr.col_dim = col;
     csr.nnz = nnz;
 
-    // ---------- 2. CPU 端直接生成合法 CSR ----------
-    // 2.1 每行非零个数
+    // ---------- 2. CPU 端高效生成合法 CSR (Optimized) ----------
+    std::cout << "Starting optimized CPU-side CSR generation..." << std::endl;
+
+    // 2.1 每行非零个数 (Unchanged)
     int base = nnz / row;
     int rem  = nnz % row;
     std::vector<int> h_row_ptr(row + 1, 0);
-    std::vector<int> h_col_ind;
-    h_col_ind.reserve(nnz);
-
+    h_row_ptr[0] = 0;
     std::vector<int> nnz_per_row(row, base);
-    for (int i = 0; i < rem; ++i) nnz_per_row[i] += 1;
-
-    // 2.2 随机选列（行内不重复）
-    std::mt19937 gen(std::random_device{}());
-    std::vector<int> cols(col);
-    for (int i = 0; i < col; ++i) cols[i] = i;
-    // First guaranttee that each col is selected at least once
-    std::vector<int> unselected_cols(col);
-std::iota(unselected_cols.begin(), unselected_cols.end(), 0);
-std::shuffle(unselected_cols.begin(), unselected_cols.end(), gen);
-
-int ptr = 0;
-for (int i = 0; i < row; ++i) {
-    int k = nnz_per_row[i];
-    k = std::min(k, col);
-
-    // 保证每列至少出现一次
-    std::vector<int> selected;
-    if (!unselected_cols.empty()) {
-        selected.push_back(unselected_cols.back());
-        unselected_cols.pop_back();
+    for (int i = 0; i < rem; ++i) {
+        nnz_per_row[i] += 1;
+    }
+    // Cumulatively sum to create the row pointers
+    for (int i = 0; i < row; ++i) {
+        h_row_ptr[i + 1] = h_row_ptr[i] + nnz_per_row[i];
+    }
+    std::cout << "Row pointers calculated." << std::endl;
+    // Make sure the total nnz matches the final row pointer
+    if (h_row_ptr[row] != nnz) {
+        // This can happen due to integer division/rounding; adjust the last element
+        nnz = h_row_ptr[row]; 
+        std::cout << "Warning: nnz adjusted to " << nnz << " to match row distribution." << std::endl;
+        csr.nnz = nnz;
     }
 
-    // 补足剩余 k-1 个（避免重复）
-    std::vector<int> available;
-    for (int j = 0; j < col; ++j) {
-        if (std::find(selected.begin(), selected.end(), j) == selected.end()) {
-            available.push_back(j);
+    std::vector<int> h_col_ind(nnz);
+    
+    // 2.2 高效随机选列 (Efficient random column selection)
+    std::mt19937 gen(std::random_device{}());
+
+    // --- Key Change 1: Create reusable data structures ---
+    // A single vector with all possible column indices (0, 1, ..., col-1)
+    // --- Key Change 1: Reusable structures with a position lookup for O(1) finds ---
+    std::vector<int> col_candidates(col);
+    std::iota(col_candidates.begin(), col_candidates.end(), 0);
+    
+    // To guarantee each column is used at least once
+    std::vector<int> unselected_cols(col);
+    std::iota(unselected_cols.begin(), unselected_cols.end(), 0);
+    std::shuffle(unselected_cols.begin(), unselected_cols.end(), gen);
+
+    for (int i = 0; i < row; ++i) {
+        int k = nnz_per_row[i];
+        if (k == 0) continue;
+
+        int num_to_sample = k;
+        int sampling_pool_size = col;
+        
+        // Pointer to the start of the current row's column data in the final array
+        auto row_col_start = h_col_ind.begin() + h_row_ptr[i];
+
+        // --- Key Change 2: Handle guaranteed column by swapping it out of the pool ---
+        int guaranteed_col = -1;
+        if (!unselected_cols.empty()) {
+            guaranteed_col = unselected_cols.back();
+            unselected_cols.pop_back();
+
+            // Place the guaranteed column
+            *row_col_start = guaranteed_col;
+
+            // Find and swap it to the end of the candidate list to exclude it from sampling
+            auto it = std::find(col_candidates.begin(), col_candidates.end(), guaranteed_col);
+            std::iter_swap(it, col_candidates.begin() + sampling_pool_size - 1);
+            
+            sampling_pool_size--; // The pool of candidates is now one smaller
+            num_to_sample--;      // We need to sample one less column
+        }
+
+        // --- Key Change 3: A true O(k) partial Fisher-Yates shuffle ---
+        for (int j = 0; j < num_to_sample; ++j) {
+            // Pick a random element from the available pool [j, sampling_pool_size - 1]
+            std::uniform_int_distribution<int> distrib(j, sampling_pool_size - 1);
+            int rand_idx = distrib(gen);
+            // Swap it to the front of the sampling section
+            std::swap(col_candidates[j], col_candidates[rand_idx]);
+        }
+        
+        // Copy the k (or k-1) sampled elements directly to the final array
+        std::copy(col_candidates.begin(), 
+                  col_candidates.begin() + num_to_sample, 
+                  row_col_start + (guaranteed_col != -1 ? 1 : 0));
+
+        // --- Key Change 4: Sort the final row data in-place ---
+        std::sort(row_col_start, row_col_start + k);
+        
+        // Restore the candidate pool for the next iteration if we modified it
+        if (guaranteed_col != -1) {
+             auto it = std::find(col_candidates.begin(), col_candidates.end(), guaranteed_col);
+             std::iter_swap(it, col_candidates.begin() + sampling_pool_size);
         }
     }
-    std::shuffle(available.begin(), available.end(), gen);
-    int need = k - selected.size();
-    selected.insert(selected.end(), available.begin(), available.begin() + need);
 
-    std::sort(selected.begin(), selected.end());
-    h_col_ind.insert(h_col_ind.end(), selected.begin(), selected.end());
-    ptr += selected.size();
-    h_row_ptr[i + 1] = ptr;
-}
     printf("nnz = %d, h_col_ind.size() = %zu\n", nnz, h_col_ind.size());
-
-    // 2.3 拷贝到 GPU
+    // 2.3 拷贝到 GPU (Unchanged)
     cudaMemcpy(csr.row_ptr, h_row_ptr.data(), (row + 1) * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(csr.col_ind, h_col_ind.data(), nnz * sizeof(int),   cudaMemcpyHostToDevice);
+    cudaMemcpy(csr.col_ind, h_col_ind.data(), nnz * sizeof(int), cudaMemcpyHostToDevice);
+
+    std::cout << "CPU-side generation complete. Starting GPU computations..." << std::endl;
 
     // ---------- 3. 其余随机填充（不变） ----------
+    // This section also remains the same.
     curandState* d_state;
     cudaMalloc(&d_state, nnz * sizeof(curandState));
     setup_rng<<<(nnz + 255) / 256, 256>>>(d_state, 1234ULL, nnz);
     uniform_rand_fill(csr.u_val, 0.5, 1.0, nnz);
-    // fill(csr.u_val, 1.0, nnz);
-    // fill(csr.b, 0.25 * row, col)
     fill(csr.b, b_value, col);
     double *u_sum = nullptr;
     cudaMalloc(&u_sum, col * sizeof(double));
     csr_column_sum(nnz, col, u_sum, csr.u_val, csr.col_ind);
-    print_cuarray("u_sum", u_sum, col);
     self_div(col, u_sum, csr.b);
     compute_x0<<<(nnz + 255) / 256, 256>>>(csr.u_val, csr.col_ind, u_sum, csr.x0, nnz);
 
-    // 5. 清理
+    // 5. 清理 (Unchanged)
     cudaFree(d_state);
     cudaFree(d_u_sum_dim_1);
     cudaFree(d_vec_val);
+    cudaFree(u_sum); // Don't forget to free u_sum
+    printf("------Generate Successfully------\n");
 }
 
 void print_fisher_problem(const FisherProblem &problem){
@@ -261,4 +320,51 @@ void print_fisher_problem(const FisherProblem &problem){
     print_cuarray("row_ptr", problem.row_ptr, problem.row_dim + 1);
     // print_cuarray("bounds", problem.bounds, 3 * problem.nnz);
     printf("==========End of FisherProblem==========\n");
+}
+
+FisherProblemHost to_host(const FisherProblem& gpu_problem) {
+    FisherProblemHost host;
+    host.row_dim = gpu_problem.row_dim;
+    host.col_dim = gpu_problem.col_dim;
+    host.nnz     = gpu_problem.nnz;
+    host.power   = gpu_problem.power;
+    host.x0      = copy_from_device(gpu_problem.x0, gpu_problem.nnz);
+    host.w       = copy_from_device(gpu_problem.w, gpu_problem.row_dim);
+    host.u_val   = copy_from_device(gpu_problem.u_val, gpu_problem.nnz);
+    host.b       = copy_from_device(gpu_problem.b, gpu_problem.col_dim);
+    host.col_ind = copy_from_device(gpu_problem.col_ind, gpu_problem.nnz);
+    host.row_ptr = copy_from_device(gpu_problem.row_ptr, gpu_problem.row_dim + 1);
+    return host;
+}
+void save_problem_to_files(const FisherProblemHost& prob,
+                           const std::string& base_dir,
+                           const std::string& stem)
+{
+    namespace fs = std::filesystem;
+    fs::path dir(base_dir);
+    fs::create_directories(dir); 
+
+    nlohmann::json j;
+    j["row_dim"] = prob.row_dim;
+    j["col_dim"] = prob.col_dim;
+    j["nnz"]      = prob.nnz;
+    j["power"]    = prob.power;
+    j["x0"]       = stem + "_x0.npy";
+    j["w"]        = stem + "_w.npy";
+    j["u_val"]    = stem + "_u_val.npy";
+    j["b"]        = stem + "_b.npy";
+    j["col_ind"]  = stem + "_col_ind.npy";
+    j["row_ptr"]  = stem + "_row_ptr.npy";
+
+    std::ofstream((dir / (stem + "_meta.json")).string()) << j.dump(2);
+
+    auto save = [&](const std::string& name, const auto* data, const std::vector<size_t>& shape) {
+        cnpy::npy_save((dir / name).string(), data, shape, "w");
+    };
+    save(j["x0"],       &prob.x0[0],      {static_cast<size_t>(prob.nnz)});
+    save(j["w"],        &prob.w[0],       {static_cast<size_t>(prob.row_dim)});
+    save(j["u_val"],    &prob.u_val[0],   {static_cast<size_t>(prob.nnz)});
+    save(j["b"],        &prob.b[0],       {static_cast<size_t>(prob.col_dim)});
+    save(j["col_ind"],  &prob.col_ind[0], {static_cast<size_t>(prob.nnz)});
+    save(j["row_ptr"],  &prob.row_ptr[0], {static_cast<size_t>(prob.row_dim + 1)});
 }

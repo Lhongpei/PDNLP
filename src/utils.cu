@@ -360,3 +360,25 @@ bool detect_inf_nan(
 
 template bool detect_inf_nan<double>(const double*, int);
 
+template<typename T>
+std::vector<T> copy_from_device(T* d_ptr, size_t count) {
+    std::vector<T> host(count);
+    cudaMemcpy(host.data(), d_ptr, count * sizeof(T), cudaMemcpyDeviceToHost);
+    return host;
+}
+template std::vector<double> copy_from_device<double>(double*, size_t);
+template std::vector<float> copy_from_device<float>(float*, size_t);
+template std::vector<int> copy_from_device<int>(int*, size_t);
+template std::vector<unsigned int> copy_from_device<unsigned int>(unsigned int*, size_t);
+
+std::string make_time_prefix() {
+    using namespace std::chrono;
+    auto now   = system_clock::now();
+    auto ms    = duration_cast<milliseconds>(now.time_since_epoch()) % 1000;
+    auto timer = system_clock::to_time_t(now);
+
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&timer), "%Y%m%d_%H%M%S")
+       << "_" << std::setw(3) << std::setfill('0') << ms.count();
+    return ss.str();      // 例如 20240804_153027_123
+}

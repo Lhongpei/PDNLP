@@ -72,7 +72,15 @@
         "__hash_table": "cpp",
         "__split_buffer": "cpp",
         "__tree": "cpp",
-        "queue": "cpp"
+        "queue": "cpp",
+        "any": "cpp",
+        "codecvt": "cpp",
+        "complex": "cpp",
+        "forward_list": "cpp",
+        "regex": "cpp",
+        "fstream": "cpp",
+        "ranges": "cpp",
+        "valarray": "cpp"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }
