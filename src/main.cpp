@@ -11,8 +11,8 @@
 int main() {
     int run_times = 1;
 
-    int row_dim = 10000000;
-    int col_dim = 400;
+    int row_dim = 100;
+    int col_dim = 40;
     int nnz = static_cast<int>(row_dim * 0.2 * col_dim);
     printf("Row dimension: %d, Column dimension: %d, Non-zero elements: %d\n", row_dim, col_dim, nnz);
     double power = 0.5;
@@ -27,9 +27,6 @@ int main() {
     CUDA_CHECK(cudaGetLastError());
 
     //Save solving time and iterations use a json file
-
-
-
     for (int i = 0; i < run_times; ++i) {
         FisherProblem problem;    
         auto start_generate_time = std::chrono::steady_clock::now();

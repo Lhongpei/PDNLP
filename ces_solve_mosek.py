@@ -130,7 +130,7 @@ if __name__ == "__main__":
                     'optimizerTime': model_dict['solverTime'],
                     'status': model_dict['status']
                 }
-    # 将结果保存为DataFrame并输出
+
     result_df = pd.DataFrame.from_dict({(i,j): result_dict[i][j] 
                                          for i in result_dict.keys()
                                          for j in result_dict[i].keys()},
