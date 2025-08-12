@@ -6,196 +6,73 @@
 #include "fisher_func.h"
 #include "lbfgsbcuda.h"
 #include "utils.h"
-template <typename real>
-real lbfgsb_cuda_primal(
-    const int row,
-    const int col,
-    const int nnz,
-    real* d_x_val,
-    const real* d_u_val,
-    const real* d_w,
-    const int* d_row_ptr,
-    const int* d_col_indice,
-    const int power,
-    const real* d_p,
-    const real tau,
-    const real* d_x_old_val,
-    real* d_utility_no_power,
-    real* d_gradient,
-    real* d_obj_tmp)
-{
-    // initialize LBFGSB option
-    LBFGSB_CUDA_OPTION<real> lbfgsb_options;
+#include "pdhg.h"
+#include "pdhg_struct.h"
+int main() {
+    int run_times = 1;
 
-    lbfgsbcuda::lbfgsbdefaultoption<real>(lbfgsb_options);
-    lbfgsb_options.mode = LCM_CUDA;
-    lbfgsb_options.eps_f = static_cast<real>(1e-8);
-    lbfgsb_options.eps_g = static_cast<real>(1e-8);
-    lbfgsb_options.eps_x = static_cast<real>(1e-8);
-    lbfgsb_options.max_iteration = 1000;
+    int row_dim = 10000000;
+    int col_dim = 400;
+    int nnz = static_cast<int>(row_dim * 0.2 * col_dim);
+    printf("Row dimension: %d, Column dimension: %d, Non-zero elements: %d\n", row_dim, col_dim, nnz);
+    double power = 0.5;
+    // print_fisher_problem(problem);
+    PdhgOptions<double> options;
+    options.max_outer_iterations = 20000;
+    options.max_inner_iterations = 100;
+    options.check_frequency = 120;
+    options.verbose_frequency = 100;
+    options.tol =  1e-4;
+    options.debug = false;
+    CUDA_CHECK(cudaGetLastError());
 
-    // initialize LBFGSB state
-    LBFGSB_CUDA_STATE<real> state;
-    memset(&state, 0, sizeof(state));
-    real* assist_buffer_cuda = nullptr;
-    cublasStatus_t stat = cublasCreate(&(state.m_cublas_handle));
-    if (CUBLAS_STATUS_SUCCESS != stat) {
-        std::cout << "CUBLAS init failed (" << stat << ")" << std::endl;
-        exit(0);
-    }
+    //Save solving time and iterations use a json file
 
-    real minimal_f = std::numeric_limits<real>::max();
-    // setup callback function that evaluate function value and its gradient
-    state.m_funcgrad_callback = [
-        &minimal_f,
-        &row,
-        &d_u_val,
-        &d_w,
-        &d_row_ptr,
-        &d_col_indice,
-        &power,
-        &d_p,
-        &tau,
-        &d_x_old_val,
-        &d_utility_no_power,
-        &d_obj_tmp
-    ](
-        real* x, real& f, real* g,
-        const cudaStream_t& stream,
-        const LBFGSB_CUDA_SUMMARY<real>& summary
-    ) {
-        launch_objective_csr<real>(
-            row, x, d_u_val, d_w, d_row_ptr, d_col_indice, power, d_obj_tmp,f, d_p, tau,
-            d_x_old_val);
-        launch_gradient_csr<real>(
-            row, x, d_u_val, d_w, d_row_ptr, d_col_indice, power, d_p, tau,
-            d_x_old_val, d_utility_no_power, g);
-        if (summary.num_iteration % 1 == 0) {
-        std::cout << "CUDA iteration " << summary.num_iteration << " F: " << f
-                    << std::endl;
+
+
+    for (int i = 0; i < run_times; ++i) {
+        FisherProblem problem;    
+        auto start_generate_time = std::chrono::steady_clock::now();
+        generate_problem_gpu(row_dim, col_dim ,nnz, problem, power, static_cast<double>(col_dim) * 0.25);
+        auto end_generate_time = std::chrono::steady_clock::now();
+        printf("Problem generation time: %.2f seconds\n", 
+            std::chrono::duration_cast<std::chrono::milliseconds>(end_generate_time - start_generate_time).count() / 1000.0f);
+        PdhgLog<double> log = adaptive_pdhg_fisher(problem, options);
+        std::string running_log_dir = std::string(FILE_IO_DIR) + "/log" + "/ces_row_" + std::to_string(row_dim) + "_col_" + std::to_string(col_dim) + "_nnz_" + std::to_string(nnz) + "_" + std::to_string(power);
+        std::filesystem::create_directories(running_log_dir);
+        printf("Problem power: %f\n", problem.power);
+        FisherProblemHost problem_host = to_host(problem);
+        std::string time_prefix = make_time_prefix();
+        save_problem_to_files(problem_host, 
+            std::string(FILE_IO_DIR) + "/problem" + "/ces_row_" + std::to_string(row_dim) + "_col_" + std::to_string(col_dim) + "_nnz_" + std::to_string(nnz) + "_" + std::to_string(problem.power) + "/" + time_prefix, 
+            "fisher_ces");
+        std::string log_file_path = running_log_dir + "/" + time_prefix + ".json";
+        std::cout << "Saving log to: " << log_file_path << std::endl;
+        nlohmann::json log_json;
+        log_json["num_outer_iterations"] = log.num_outer_iterations;
+        log_json["num_inner_iterations"] = log.num_inner_iterations;
+        log_json["outer_solving_time"]   = log.outer_solving_time;
+        log_json["inner_solving_time"]   = log.inner_solving_time;
+
+        std::ofstream ofs(log_file_path);
+        if (ofs.is_open()) {
+            ofs << std::setprecision(6) << std::fixed << log_json.dump(4);
+            ofs.close();
+        } else {
+            std::cerr << "Failed to open log file: " << log_file_path << std::endl;
         }
-        minimal_f = fmin(minimal_f, f);
-        return 0;
-    };
-    // initialize number of bounds (0 for this example)
-    int *nbd = nullptr;
-    real *xl = nullptr;
-    real *xu = nullptr;
-    cudaMalloc(&xl, nnz * sizeof(real));
-    cudaMalloc(&xu, nnz * sizeof(real));
-    cudaMalloc(&nbd, nnz * sizeof(int));
-
-
-    cudaMemset(xl, 1e-3, nnz * sizeof(real));
-    cudaMemset(xu, 0, nnz * sizeof(real));
-    fill(nbd, 1, nnz);
-    fill(xl, 1e-3, nnz);
-    cudaMemcpy(d_x_val, xl, nnz * sizeof(real), cudaMemcpyDeviceToDevice);
-    LBFGSB_CUDA_SUMMARY<real> summary;
-    memset(&summary, 0, sizeof(summary));
-
-    auto start_time = std::chrono::steady_clock::now();
-    lbfgsbcuda::lbfgsbminimize<real>(
-        nnz, state, lbfgsb_options, d_x_val, nbd, xl, xu, summary);
-    auto end_time = std::chrono::steady_clock::now();
-    auto time_duration =
-        std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-    std::cout << "Minimal function value: " << minimal_f << std::endl;
-    std::cout << "Number of iterations: " << summary.num_iteration << std::endl;
-    std::cout << "Time taken: " << time_duration << " ms; "
-              << "Average time per iteration: "
-              << (time_duration / static_cast<double>(summary.num_iteration))
-              << " ms" << std::endl;
-    std::cout << "LBFGSB CUDA minimization completed type: "
-              << summary.info << std::endl;
-
-    cudaFree(xl);
-    cudaFree(xu);
-    cudaFree(nbd);
-    cudaFree(assist_buffer_cuda);
-
-    // release cublas
-    cublasDestroy(state.m_cublas_handle);
+        // Free allocated memory
+        cudaFree(problem.x0);
+        cudaFree(problem.w);
+        cudaFree(problem.u_val);
+        cudaFree(problem.b);
+        cudaFree(problem.col_ind);
+        cudaFree(problem.row_ptr);
+        cudaFree(problem.bounds);
+        printf("Solving time: %.2f seconds\n", log.outer_solving_time);
+        std::cout << "Number of outer iterations: " << log.num_outer_iterations << std::endl;
+        std::cout << "Number of inner iterations: " << log.num_inner_iterations << std::endl;
+        
+    }
     return 0;
 }
-
-// int main()
-// {
-//     const int row_dim = 200000;
-//     const int col_dim = 10000;
-//     const int nnz = 2000000;
-//     const double tau = 3.0;
-//     FisherProblem csr;
-//     generate_problem_gpu(row_dim, col_dim, nnz, csr, 1.0);
-//     fill(csr.x0, 1.0, nnz);
-//     fill(csr.u_val, 1.0, nnz);
-//     fill(csr.w, 1.0, row_dim);
-//     double *d_x_old = nullptr;
-//     cudaMalloc(&d_x_old, nnz * sizeof(double));
-//     cudaMemset(d_x_old, 0, nnz * sizeof(double));
-//     fill(d_x_old, 0.5, nnz);
-//     double *h_x0 = new double[nnz];
-//     cudaMemcpy(h_x0, csr.x0, nnz * sizeof(double), cudaMemcpyDeviceToHost);
-//     std::cout << "First 5 x0: ";
-//     for (int i = 0; i < 5; ++i)
-//         std::cout << h_x0[i] << " ";
-//     std::cout << "\n";
-//     int *h_row_ptr = new int[row_dim + 1];
-//     cudaMemcpy(h_row_ptr, csr.row_ptr, (row_dim + 1) * sizeof(int), cudaMemcpyDeviceToHost);
-//     std::cout << "Row pointers: ";
-//     for (int i = 0; i < row_dim + 1; ++i)
-//         std::cout << h_row_ptr[i] << " ";
-//     std::cout << "\n";
-//     int *h_col_ind = new int[nnz];
-//     cudaMemcpy(h_col_ind, csr.col_ind, nnz * sizeof(int), cudaMemcpyDeviceToHost);
-//     std::cout << "Column indices: ";
-//     for (int i = 0; i < nnz; ++i)
-//         std::cout << h_col_ind[i] << " ";
-//     std::cout << "\n";
-//     double *utility = new double[row_dim];
-//     double *d_utility;
-//     cudaMalloc(&d_utility, row_dim * sizeof(double));
-//     double *p;
-//     cudaMalloc(&p, col_dim * sizeof(double));
-//     cudaMemset(p, 0, col_dim * sizeof(double));
-//     fill(p, 0.5, col_dim);
-//     double *tmp_objective;
-//     cudaMalloc(&tmp_objective, row_dim * sizeof(double));
-//     std::cout<< "power: " << csr.power << "\n";
-//     launch_utility_csr<double>(
-//         row_dim, csr.x0, csr.u_val, csr.row_ptr, d_utility, csr.power);
-//     cudaDeviceSynchronize();
-//     double *h_utility = new double[row_dim];
-//     cudaMemcpy(h_utility, d_utility, row_dim * sizeof(double), cudaMemcpyDeviceToHost);
-//     std::cout << "First 5 utility: ";
-//     for (int i = 0; i < row_dim; ++i)
-//         std::cout << h_utility[i] << " ";
-//     std::cout << "\n";
-//     double obj;
-//     launch_objective_csr<double>(
-//         row_dim, csr.x0, csr.u_val, csr.w, csr.row_ptr, csr.col_ind, csr.power,
-//         tmp_objective, obj, p, tau, d_x_old
-//     );
-//     std::cout << "Objective value: " << obj << "\n";
-//     cudaMemcpy(h_utility, d_utility, row_dim * sizeof(double), cudaMemcpyDeviceToHost);
-//     std::cout << "First 5 utility: ";
-//     for (int i = 0; i < row_dim; ++i)
-//         std::cout << h_utility[i] << " ";
-//     std::cout << "\n";
-//     double *d_gradient;
-//     cudaMalloc(&d_gradient, nnz * sizeof(double));
-//     launch_gradient_csr<double>(
-//         row_dim, csr.x0, csr.u_val, csr.w, csr.row_ptr, csr.col_ind, csr.power,
-//         p, tau, d_x_old, d_utility, d_gradient
-//     );
-//     double *h_gradient = new double[nnz];
-//     cudaMemcpy(h_gradient, d_gradient, nnz * sizeof(double), cudaMemcpyDeviceToHost);
-//     std::cout << "First 5 gradient: ";
-//     for (int i = 0; i < nnz; ++i)
-//         std::cout << h_gradient[i] << " ";
-//     std::cout << "\n";
-//     lbfgsb_cuda_primal(row_dim, col_dim, nnz, csr.x0, csr.u_val, csr.w,
-//                        csr.row_ptr, csr.col_ind, csr.power, p, tau, d_x_old,
-//                        d_utility, d_gradient, tmp_objective);
-//     return 0;
-// }

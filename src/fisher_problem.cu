@@ -169,7 +169,7 @@ void build_csr_uniform(int row, int col, int nnz,
 // ... etc.
 
 void generate_problem_gpu(int row, int col, int nnz, FisherProblem &csr, double power, double b_value) {
-    // 1. 设备内存分配（不变）
+
     // This section remains the same as your original code.
     cudaMalloc(&csr.x0,      nnz * sizeof(double));
     cudaMalloc(&csr.w,       row * sizeof(double));
@@ -188,10 +188,8 @@ void generate_problem_gpu(int row, int col, int nnz, FisherProblem &csr, double 
     csr.col_dim = col;
     csr.nnz = nnz;
 
-    // ---------- 2. CPU 端高效生成合法 CSR (Optimized) ----------
     std::cout << "Starting optimized CPU-side CSR generation..." << std::endl;
 
-    // 2.1 每行非零个数 (Unchanged)
     int base = nnz / row;
     int rem  = nnz % row;
     std::vector<int> h_row_ptr(row + 1, 0);
@@ -215,7 +213,7 @@ void generate_problem_gpu(int row, int col, int nnz, FisherProblem &csr, double 
 
     std::vector<int> h_col_ind(nnz);
     
-    // 2.2 高效随机选列 (Efficient random column selection)
+    // (Efficient random column selection)
     std::mt19937 gen(std::random_device{}());
 
     // --- Key Change 1: Create reusable data structures ---
@@ -281,13 +279,12 @@ void generate_problem_gpu(int row, int col, int nnz, FisherProblem &csr, double 
     }
 
     printf("nnz = %d, h_col_ind.size() = %zu\n", nnz, h_col_ind.size());
-    // 2.3 拷贝到 GPU (Unchanged)
+
     cudaMemcpy(csr.row_ptr, h_row_ptr.data(), (row + 1) * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(csr.col_ind, h_col_ind.data(), nnz * sizeof(int), cudaMemcpyHostToDevice);
 
     std::cout << "CPU-side generation complete. Starting GPU computations..." << std::endl;
 
-    // ---------- 3. 其余随机填充（不变） ----------
     // This section also remains the same.
     curandState* d_state;
     cudaMalloc(&d_state, nnz * sizeof(curandState));
@@ -300,11 +297,11 @@ void generate_problem_gpu(int row, int col, int nnz, FisherProblem &csr, double 
     self_div(col, u_sum, csr.b);
     compute_x0<<<(nnz + 255) / 256, 256>>>(csr.u_val, csr.col_ind, u_sum, csr.x0, nnz);
 
-    // 5. 清理 (Unchanged)
+
     cudaFree(d_state);
     cudaFree(d_u_sum_dim_1);
     cudaFree(d_vec_val);
-    cudaFree(u_sum); // Don't forget to free u_sum
+    cudaFree(u_sum);
     printf("------Generate Successfully------\n");
 }
 
@@ -336,6 +333,32 @@ FisherProblemHost to_host(const FisherProblem& gpu_problem) {
     host.row_ptr = copy_from_device(gpu_problem.row_ptr, gpu_problem.row_dim + 1);
     return host;
 }
+
+FisherProblem to_device(const FisherProblemHost& host) {
+    FisherProblem gpu_problem;
+    gpu_problem.row_dim = host.row_dim;
+    gpu_problem.col_dim = host.col_dim;
+    gpu_problem.nnz     = host.nnz;
+    gpu_problem.power   = host.power;
+
+    cudaMalloc(&gpu_problem.x0,      host.nnz * sizeof(double));
+    cudaMalloc(&gpu_problem.w,       host.row_dim * sizeof(double));
+    cudaMalloc(&gpu_problem.u_val,   host.nnz * sizeof(double));
+    cudaMalloc(&gpu_problem.b,       host.col_dim * sizeof(double));
+    cudaMalloc(&gpu_problem.col_ind, host.nnz * sizeof(int));
+    cudaMalloc(&gpu_problem.row_ptr, (host.row_dim + 1) * sizeof(int));
+    cudaMalloc(&gpu_problem.bounds,  3 * host.nnz * sizeof(double));
+
+    cudaMemcpy(gpu_problem.x0,      host.x0.data(),      host.nnz * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(gpu_problem.w,       host.w.data(),       host.row_dim * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(gpu_problem.u_val,   host.u_val.data(),   host.nnz * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(gpu_problem.b,       host.b.data(),       host.col_dim * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(gpu_problem.col_ind, host.col_ind.data(), host.nnz * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(gpu_problem.row_ptr, host.row_ptr.data(), (host.row_dim + 1) * sizeof(int), cudaMemcpyHostToDevice);
+
+    return gpu_problem;
+}
+
 void save_problem_to_files(const FisherProblemHost& prob,
                            const std::string& base_dir,
                            const std::string& stem)

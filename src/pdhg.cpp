@@ -133,7 +133,27 @@ LBFGSB_CUDA_SUMMARY<real> lbfgsb_cuda_primal(
     cublasDestroy(state.m_cublas_handle);
     return summary;
 }
-//Note that we don't allow user to define initial step size and primal weight in current implementation.
+
+template LBFGSB_CUDA_SUMMARY<double> lbfgsb_cuda_primal<double>(
+    const int row,
+    const int col,
+    const int nnz,
+    double* d_x_val,
+    const double* d_u_val,
+    const double* d_w,
+    const int* d_row_ptr,
+    const int* d_col_indice,
+    const double power,
+    const double* d_p,
+    const double* d_b,
+    const double tau,
+    const double* d_x_old_val,
+    double* d_utility_no_power,
+    double* d_gradient,
+    double* d_obj_tmp,
+    double* d_x_sum,
+    bool verbose);
+
 template <typename real>
 PdhgLog<real> adaptive_pdhg_fisher(
     FisherProblem &problem,
@@ -230,13 +250,7 @@ PdhgLog<real> adaptive_pdhg_fisher(
                 print_cuarray("utility", buffer.utility, row_dim);
                 
             }
-            // std::cout << "Step size: " << state.step_size << ", Primal weight: " << state.primal_weight << std::endl;
-            // std::cout << "Primal step size: " << primal_step_size_inner << ", Dual step size: " << dual_step_size << std::endl;
-            // print_cuarray("current primal sum", buffer.current_primal_sum, col_dim);
-            // print_cuarray("current dual solution", state.current_dual_solution, col_dim);
-            // print_cuarray("last dual solution", state.last_dual_solution, col_dim);
-            // print_cuarray("current primal solution", state.current_primal_solution, nnz);
-            // print_cuarray("last primal solution", state.last_primal_solution, nnz);
+
             
             std::tuple<real, real> interaction_movement = compute_interaction_and_movement(
                         col_dim, nnz, state.primal_weight, state.current_primal_solution, state.last_primal_solution, state.current_dual_solution, 
@@ -244,7 +258,7 @@ PdhgLog<real> adaptive_pdhg_fisher(
                         
             real interaction = std::get<0>(interaction_movement);
             real movement = std::get<1>(interaction_movement);
-            // std::cout<<"interaction" << interaction << ", movement" << movement << std::endl;
+
             real step_size_limit = INFINITY;
             if (interaction > 0.0){
                 step_size_limit = movement / interaction;
@@ -258,17 +272,13 @@ PdhgLog<real> adaptive_pdhg_fisher(
             real second_term = (1.0 + 1.0 / pow((restart_info.interval_iterations + 1), 0.6)) * state.step_size;
             
             state.step_size = fmin(first_term, second_term);
-            // std::cout<< "Step size limit: " << step_size_limit 
-            //          << ", First term: " << first_term 
-            //          << ", Second term: " << second_term << ", New step size: " << state.step_size << std::endl;
+
             state.step_size = fmin(fmax(state.step_size, 0.01 / sqrt(static_cast<real>(row_dim) + static_cast<real>(col_dim))), 0.2 / sqrt(static_cast<real>(row_dim) + static_cast<real>(col_dim)));
             if (state.step_size <= step_size_limit) {
                 break;
             }
         }
-        
-        // print_cuarray("Current primal solution: ", state.current_primal_solution, nnz);
-        // print_cuarray("Current dual solution: ", state.current_dual_solution, col_dim);
+
 
 
         //=========================Update Average Solutions=========================
@@ -278,10 +288,7 @@ PdhgLog<real> adaptive_pdhg_fisher(
         weighted_self_add_diff(col_dim, state.avg_dual_solution, state.current_dual_solution, weight);
         cudaDeviceSynchronize();
         weighted_self_add_diff(col_dim, buffer.avg_primal_sum, buffer.current_primal_sum, weight);
-        // print_cuarray("avg primal sum", buffer.avg_primal_sum, col_dim);
-        // print_cuarray("current primal sum", buffer.current_primal_sum, col_dim);
-        // printf("interval iterations: %d", restart_info.interval_iterations);
-        // printf("weight: %f, step size: %f, primal weight: %f\n", weight, state.step_size, state.primal_weight);
+
         
         if (state.num_outer_iterations % options.check_frequency == 0) 
         {
@@ -374,71 +381,9 @@ PdhgLog<real> adaptive_pdhg_fisher(
     log.outer_solving_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() / 1000.0f;
     return log;
 }
-int main() {
-    int run_times = 1;
 
-    int row_dim = 10000000;
-    int col_dim = 400;
-    int nnz = static_cast<int>(row_dim * 0.2 * col_dim);
-    printf("Row dimension: %d, Column dimension: %d, Non-zero elements: %d\n", row_dim, col_dim, nnz);
-    double power = 0.5;
-    // print_fisher_problem(problem);
-    PdhgOptions<double> options;
-    options.max_outer_iterations = 20000;
-    options.max_inner_iterations = 100;
-    options.check_frequency = 120;
-    options.verbose_frequency = 100;
-    options.tol =  1e-4;
-    options.debug = false;
-    CUDA_CHECK(cudaGetLastError());
+template PdhgLog<double> adaptive_pdhg_fisher<double>(
+    FisherProblem &problem,
+    PdhgOptions<double> &options
+);
 
-    //Save solving time and iterations use a json file
-
-
-
-    for (int i = 0; i < run_times; ++i) {
-        FisherProblem problem;    
-        auto start_generate_time = std::chrono::steady_clock::now();
-        generate_problem_gpu(row_dim, col_dim ,nnz, problem, power, static_cast<double>(col_dim) * 0.25);
-        auto end_generate_time = std::chrono::steady_clock::now();
-        printf("Problem generation time: %.2f seconds\n", 
-            std::chrono::duration_cast<std::chrono::milliseconds>(end_generate_time - start_generate_time).count() / 1000.0f);
-        PdhgLog<double> log = adaptive_pdhg_fisher(problem, options);
-        std::string running_log_dir = std::string(FILE_IO_DIR) + "/log" + "/ces_row_" + std::to_string(row_dim) + "_col_" + std::to_string(col_dim) + "_nnz_" + std::to_string(nnz) + "_" + std::to_string(power);
-        std::filesystem::create_directories(running_log_dir);
-        printf("Problem power: %f\n", problem.power);
-        FisherProblemHost problem_host = to_host(problem);
-        std::string time_prefix = make_time_prefix();
-        save_problem_to_files(problem_host, 
-            std::string(FILE_IO_DIR) + "/problem" + "/ces_row_" + std::to_string(row_dim) + "_col_" + std::to_string(col_dim) + "_nnz_" + std::to_string(nnz) + "_" + std::to_string(problem.power) + "/" + time_prefix, 
-            "fisher_ces");
-        std::string log_file_path = running_log_dir + "/" + time_prefix + ".json";
-        std::cout << "Saving log to: " << log_file_path << std::endl;
-        nlohmann::json log_json;
-        log_json["num_outer_iterations"] = log.num_outer_iterations;
-        log_json["num_inner_iterations"] = log.num_inner_iterations;
-        log_json["outer_solving_time"]   = log.outer_solving_time;
-        log_json["inner_solving_time"]   = log.inner_solving_time;
-
-        std::ofstream ofs(log_file_path);
-        if (ofs.is_open()) {
-            ofs << std::setprecision(6) << std::fixed << log_json.dump(4);
-            ofs.close();
-        } else {
-            std::cerr << "Failed to open log file: " << log_file_path << std::endl;
-        }
-        // Free allocated memory
-        cudaFree(problem.x0);
-        cudaFree(problem.w);
-        cudaFree(problem.u_val);
-        cudaFree(problem.b);
-        cudaFree(problem.col_ind);
-        cudaFree(problem.row_ptr);
-        cudaFree(problem.bounds);
-        printf("Solving time: %.2f seconds\n", log.outer_solving_time);
-        std::cout << "Number of outer iterations: " << log.num_outer_iterations << std::endl;
-        std::cout << "Number of inner iterations: " << log.num_inner_iterations << std::endl;
-        
-    }
-    return 0;
-}

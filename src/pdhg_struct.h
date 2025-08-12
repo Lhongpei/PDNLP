@@ -74,6 +74,7 @@ struct PdhgOptions {
     bool debug                  = false;
 };
 
+
 template <typename real>
 struct PdhgLog {
     int   num_outer_iterations = 0;
@@ -85,3 +86,4 @@ struct PdhgLog {
     real* primal_residual      = nullptr;
     real* dual_residual        = nullptr;
 };
+
