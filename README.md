@@ -74,6 +74,7 @@ $$
 
 ### Stop Criterion
 The relative residual $r$ is defined as $r= \max(r_{\text{primal}}, r_{\text{dual}})$, and $r_{\text{primal}}$ and $r_{\text{dual}}$ are defined as:
+<img width="453" height="148" alt="image" src="asset/formula_residual.jpg" />
 
 
 By setting $p=0.5$ and $r<1e-4$, we conduct a experiment over different scales of problems compared with Mosek.
