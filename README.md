@@ -3,7 +3,7 @@
 
 [](https://www.google.com/search?q=) [](https://www.google.com/search?q=/LICENSE)
 
-This repository contains a high-performance, GPU-accelerated solver for large-scale **Nonlinear Programming (NLP)** problems with linear equality and box constraints. It leverages a **Restarted Anderson-accelerated Primal-Dual Hybrid Gradient (rAPDHG)** scheme, using **L-BFGS-B** to efficiently solve the primal subproblem.
+This repository contains a high-performance, GPU-accelerated solver for large-scale **Nonlinear Programming (NLP)** problems with linear equality and box constraints. It leverages a **Restarted Adaptive Primal-Dual Hybrid Gradient (rAPDHG)** scheme, using **L-BFGS-B** to efficiently solve the primal subproblem.
 
 -----
 
@@ -19,7 +19,7 @@ If you have questions or suggestions, please open an issue or email me at `ishon
 
   * **GPU Accelerated:** Designed from the ground up for massive parallelism on GPUs to handle large-scale problems.
   * **Efficient Subproblem Solver:** Integrates L-BFGS-B to exactly and efficiently solve the primal subproblem, including box constraints. This improves robustness compared to methods that only approximate the solution.
-  * **Advanced PDHG Scheme:** Employs a Restarted Anderson-accelerated Primal-Dual Hybrid Gradient method for faster convergence.
+  * **Advanced PDHG Scheme:** Employs a Restarted Adaptive Primal-Dual Hybrid Gradient method for faster convergence.
 
 -----
 
