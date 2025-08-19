@@ -119,7 +119,7 @@ __global__ void reductionKernel(const real* __restrict__ d_in, real* __restrict_
     }
     if (tid == 0)
     {
-        d_out[blockIdx.x] = sum; // 将结果存回全局内存
+        d_out[blockIdx.x] = sum; 
     }
 }
 template <typename real>
@@ -185,7 +185,7 @@ __global__ void reductionKernelwithFunc(const real* __restrict__ d_in, real* __r
     }
     if (tid == 0)
     {
-        d_out[blockIdx.x] = sum; // 将结果存回全局内存
+        d_out[blockIdx.x] = sum;
     }
 }
 template <int blockSize, ReductionOp op, typename real>
@@ -245,7 +245,7 @@ __global__ void reductionSelfKernel(real* __restrict__ data, const int N)
     }
     if (tid == 0)
     {
-        data[blockIdx.x] = sum; // 将结果存回全局内存
+        data[blockIdx.x] = sum;
     }
 }
 
@@ -574,7 +574,6 @@ template double cuNorm(const double* d_input, const int N, NormType norm_type);
 //     return 0;
 // }
 
-// // // CPU 黄金实现
 // // template<typename real>
 // // real cpuNorm(const std::vector<real>& v, NormType t)
 // // {
@@ -589,22 +588,20 @@ template double cuNorm(const double* d_input, const int N, NormType norm_type);
 // // // int main()
 // // // {
 // // //     using real = double; // Change to double if needed
-// // //     const int N = 10007;                    // 非 2 的幂测试
+// // //     const int N = 10007;                 
 // // //     std::vector<real> h_in(N);
-// // //     for (int i = 0; i < N; ++i) h_in[i] = real(i - 5000) * 0.123f; // 有正有负
+// // //     for (int i = 0; i < N; ++i) h_in[i] = real(i - 5000) * 0.123f; 
 
-// // //     // 拷到 GPU
 // // //     real *d_in;
 // // //     cudaMalloc(&d_in, N * sizeof(real));
 // // //     cudaMemcpy(d_in, h_in.data(), N * sizeof(real), cudaMemcpyHostToDevice);
 
-// // //     // 分别测试三种范数
 // // //     const NormType types[] = { NORM_L1, NORM_L2, NORM_INF };
 // // //     const char* names[]    = { "L1", "L2", "INF" };
 
 // // //     for (int k = 0; k < 3; ++k)
 // // //     {
-// // //         real gpu = cuNorm<real>(d_in, N, types[k]); // 注意 L2 返回平方和
+// // //         real gpu = cuNorm<real>(d_in, N, types[k]); 
 
 // // //         real cpu = cpuNorm(h_in, types[k]);
 
