@@ -9,3 +9,4 @@ cnpy/*
 *.pyc
 real_data/*
 *.py
+*.zip

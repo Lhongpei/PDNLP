@@ -81,14 +81,14 @@ By setting $p=0.5$ and $r<1e-4$, we conduct a experiment over different scales o
 The results below demonstrate a significant performance advantage for our solver as the problem size scales.
 For Mosek, we use the conic formulation of Fisher problem with CES Utility.
 
-| Agents (n) | Goods (m) | Variables (n\*m) | Mosek Time (s) | **This Project (s)** | Speedup |
-| :--------- | :-------- | :-------------- | :------------- | :------------------- | :------ |
-| 1,000      | 400       | 80,000          | 1.60           | **1.33** | 1.2x    |
-| 10,000     | 4,000     | 800,000         | 29.13          | **2.75** | 10.6x   |
-| 100,000    | 4,000     | 8,000,000       | 218.56         | **9.48** | 23.1x   |
-| 100,000    | 5,000     | 10,000,000      | 302.05         | **20.98** | 14.4x   |
-| 1,000,000  | 10,000    | 20,000,000      | 556.57         | **87.61** | 6.4x    |
-
+| Agents (n) | Goods (m) | Variables (n\*m) | Mosek Time (s) | **This Project (s)** | 
+| :--------- | :-------- | :-------------- | :------------- | :------------------- | 
+| 1,000      | 400       | 80,000          | 1.60           | **1.33** | 
+| 10,000     | 4,000     | 800,000         | 29.13          | **2.75** | 
+| 100,000    | 4,000     | 8,000,000       | 218.56         | **9.48** | 
+| 100,000    | 5,000     | 10,000,000      | 302.05         | **20.98** | 
+| 1,000,000  | 10,000    | 20,000,000      | 556.57         | **22.61** | 
+| 5,000,000  | 4,0000    | 30,000,000      | 831.21         |  **84.21** |
 -----
 
 ## 🗺️ Roadmap
