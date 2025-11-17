@@ -104,11 +104,9 @@ __global__ void gradient_csr_kernel(
         real p_col = __ldg(&p[col_indice[j]]);
 
         real x_safe = fmaxf(x, 1e-12f);
-        real x_pow = (power == 2) ? x_safe : powf(x_safe, power - 1); // 特化 power=2 的情况
+        real x_pow = (power == 2) ? x_safe : powf(x_safe, power - 1);
 
         gradient[j] = -w_row * u * x_pow / utility_denom + p_col + tau * (x - x_old);
-        // printf("Check all values: row_idx = %d, j = %d, x = %f, u = %f, x_old = %f, p_col = %f, gradient[j] = %f, w_row = %f, utility_denom = %f, inv_pho = %f\n",
-        //        row_idx, j, x, u, x_old, p_col, gradient[j], w_row, utility_denom, inv_pho);
     }
 }
 
@@ -207,12 +205,7 @@ __global__ void objective_csr_kernel1(
     if (tid == 0)
     {
         real log_sum = logf(fmaxf(powf(sum, 1.0 / power), 1e-12f));
-        // printf("Log_sum for row %d: %f\n", row_idx, log_sum); // 输出调试信息
-        // printf("Block %d processing row %d: sum = %f, ptot = %f, x_delta = %f\n", blockIdx.x, row, sum, ptot, x_delta); // 输出调试信息
         objective[row_idx] = -w[row_idx] * log_sum + (0.5f * tau) * x_delta;
-        // printf("Objective for row_idx %d: %f\n", row_idx, objective[row_idx]); // 输出调试信息
-        // printf("w[row_idx]: %f, tau: %f\n", w[row_idx], tau); // 输出调试信息
-        // printf("x_delta: %f\n", x_delta); // 输出调试信息
     }
 }
 
@@ -324,11 +317,8 @@ __global__ void utility_csr_kernel(
     {
         real xi = x_val[j];
         real ui = u_val[j];
-        // printf("sum = %f, row = %d, xi = %f, ui = %f\n", sum, row_idx, xi, ui); // 输出调试信息
-        // for (int k = 0; k < power; ++k) tmp *= xi;
-        sum += pow(xi, power) * ui; // 使用 pow 函数计算 xi 的 power 次方
-        // printf("Block %d processing row %d: sum = %f, xi = %f, ui = %f\n", blockIdx.x, row_idx, sum, xi, ui); // 输出调试信息
-        // printf("power = %f\n, cal_res = %f\n", power, pow(xi, power)); // 输出调试信息
+
+        sum += pow(xi, power) * ui; 
     }
 
     shm[tid] = sum;
@@ -350,21 +340,20 @@ __global__ void utility_csr_kernel(
     if (tid == 0)
     {
         utility[row_idx] = sum;
-        // printf("Block %d processing row %d: sum = %f\n", blockIdx.x, row, sum); // 输出调试信息
     }
 }
 
 template <typename real>
 void launch_utility_csr(
-    const int row,
+    const int nnz,
     const real *d_x_val,
     const real *d_u_val,
     const int *d_row_ptr,
     real *d_utility,
     const real power)
 {
-    const int blockSize = 256; // 每 block 最多 256 线程
-    int gridSize = row;       // 每行一个 block
+    const int blockSize = 256; 
+    int gridSize = row;     
     utility_csr_kernel<blockSize, real><<<gridSize, blockSize, 0>>>(
         row, d_x_val, d_u_val, d_row_ptr, d_utility, power);
     cudaDeviceSynchronize();
@@ -375,3 +364,39 @@ template void launch_utility_csr<double>(
     const int, const double *, const double *, const int *, double *, const double);
 template void launch_utility_csr<float>(
     const int, const float *, const float *, const int *, float *, const float);
+
+__global__ void calcualte_D_inv_d_hessian_CES_kernel(
+    const int row,
+    const double power,
+    const double inv_tau,
+    const double* __restrict__ d_w,
+    const double* __restrict__ d_x_val,
+    const int* __restrict__ d_row_ptr,
+    const double* __restrict__ d_u_val,
+    const double* __restrict__ d_utility_no_power,
+    double* __restrict__ D_inv,
+    double* __restrict__ d,
+    double& D_inv_d)
+{
+    int row_idx = blockIdx.x;
+    if (row_idx >= row)
+        return;
+    int start = d_row_ptr[row_idx];
+    int end = d_row_ptr[row_idx + 1];
+    double utility_denom = fmax(d_utility_no_power[row_idx], 1e-12);
+    double w = d_w[row_idx];
+    for (int j = start + threadIdx.x; j < end; j += blockDim.x)
+    {
+        double x = d_x_val[j];
+        double u = d_u_val[j];
+        
+        D_inv_j = 1 / (inv_tau + (1.0 - power) * w * u * pow(x, power - 2) / utility_denom);
+        d_j = sqrt(w * power) * u * pow(x, power - 1) / utility_denom;
+        D_inv[j] = D_inv_j;
+        d[j] = d_j;
+        D_inv_d[j] = D_inv_j * d_j;
+    }
+    return;
+}
+
+    

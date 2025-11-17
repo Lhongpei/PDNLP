@@ -87,3 +87,9 @@ struct PdhgLog {
     real* dual_residual        = nullptr;
 };
 
+
+struct HessianBufferCES {
+    double* d = nullptr;
+    double* D_inv = nullptr;
+    double* D_inv_d = nullptr;
+};

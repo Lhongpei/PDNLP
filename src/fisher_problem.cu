@@ -10,7 +10,6 @@
 #include "json.hpp"
 #include <fstream>
 #include "cnpy.h"
-// 初始化随机数生成器
 __global__ void setup_rng(curandState* state, unsigned long long seed, int nnz) {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if (idx < nnz) {
@@ -18,7 +17,6 @@ __global__ void setup_rng(curandState* state, unsigned long long seed, int nnz) 
     }
 }
 
-// 填充随机数
 __global__ void fill_rand(curandState* state, double* data, int nnz) {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if (idx < nnz) {
@@ -26,7 +24,6 @@ __global__ void fill_rand(curandState* state, double* data, int nnz) {
     }
 }
 
-// 填充随机数 b
 __global__ void fill_rand_b(curandState* state, double* data, int row) {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if (idx < row) {
@@ -34,7 +31,6 @@ __global__ void fill_rand_b(curandState* state, double* data, int row) {
     }
 }
 
-// 生成 [0, col-1] 范围内的随机整数
 __global__ void generate_random_integers(curandState* state, int* col_ind, int nnz, int col) {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if (idx < nnz) {
@@ -47,7 +43,6 @@ __global__ void fill_rand_int(curandState* state, int* dst, int low, int high, i
     if (idx >= size) return;
     dst[idx] = low + (int)(curand_uniform(&state[idx]) * (high - low));
 }
-// 确保每行的列索引是唯一的
 __global__ void unique_columns(int* col_ind, int* row_ptr, int row, int col) {
     int row_idx = blockIdx.x;
     if (row_idx >= row) return;
@@ -56,17 +51,14 @@ __global__ void unique_columns(int* col_ind, int* row_ptr, int row, int col) {
     int end = row_ptr[row_idx + 1];
     int num_cols = end - start;
 
-    // 使用一个临时数组存储列索引
     extern __shared__ int shared_cols[];
     int* temp_cols = shared_cols;
 
-    // 将列索引加载到共享内存
     for (int i = threadIdx.x; i < num_cols; i += blockDim.x) {
         temp_cols[threadIdx.x + i] = col_ind[start + i];
     }
     __syncthreads();
 
-    // 简单的冒泡排序（适用于小数组）
     for (int i = 0; i < num_cols - 1; ++i) {
         for (int j = 0; j < num_cols - i - 1; ++j) {
             if (temp_cols[j] > temp_cols[j + 1]) {
@@ -78,7 +70,6 @@ __global__ void unique_columns(int* col_ind, int* row_ptr, int row, int col) {
     }
     __syncthreads();
 
-    // 去重
     int unique_count = 0;
     for (int i = 0; i < num_cols; ++i) {
         if (i == 0 || temp_cols[i] != temp_cols[i - 1]) {
@@ -88,7 +79,6 @@ __global__ void unique_columns(int* col_ind, int* row_ptr, int row, int col) {
     }
 }
 
-// 计算 u_sum_dim_1 和 vec_val
 __global__ void compute_u_sum_dim_1_and_vec_val(double* u_val, int* row_ptr, double* b, double* u_sum_dim_1, double* vec_val, int row) {
     int row_idx = blockIdx.x;
     if (row_idx >= row) return;
@@ -100,20 +90,20 @@ __global__ void compute_u_sum_dim_1_and_vec_val(double* u_val, int* row_ptr, dou
         sum += u_val[i];
     }
     u_sum_dim_1[row_idx] = sum;
-    vec_val[row_idx] = b[row_idx] / sum; // 避免除零
+    vec_val[row_idx] = b[row_idx] / sum; 
 }
 
 __global__ void compute_x0(
     const double* u_val,
     const int*    col_ind,
-    const double* vec_val,   // vec_val[col] 是列 j 的缩放因子
+    const double* vec_val,  
     double*       x0,
     int nnz)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= nnz) return;
 
-    int col = col_ind[idx];     // 第 idx 个非零元所在的列
+    int col = col_ind[idx]; 
     x0[idx] = u_val[idx] * vec_val[col];
 }
 
@@ -121,8 +111,6 @@ __global__ void compute_x0(
 #include <algorithm>
 #include <random>
 
-// row: 行数, col: 列数, nnz: 总非零数
-// 返回: row_ptr, col_ind
 void build_csr_uniform(int row, int col, int nnz,
                        std::vector<int>& row_ptr,
                        std::vector<int>& col_ind)
@@ -130,25 +118,21 @@ void build_csr_uniform(int row, int col, int nnz,
     row_ptr.assign(row + 1, 0);
     col_ind.reserve(nnz);
 
-    // 1. 每行基础非零个数
     int base = nnz / row;
-    int rem  = nnz % row;            // 余数分配给前 rem 行
+    int rem  = nnz % row;         
 
-    // 2. 构造每行计数
     std::vector<int> nnz_per_row(row, base);
     for (int i = 0; i < rem; ++i) nnz_per_row[i] += 1;
 
-    // 3. 随机数引擎
     std::mt19937 gen(std::random_device{}());
 
-    // 4. 逐行生成不重复列索引
     std::vector<int> cols(col);
     for (int i = 0; i < col; ++i) cols[i] = i;
 
     int ptr = 0;
     for (int i = 0; i < row; ++i) {
         int k = nnz_per_row[i];
-        if (k > col) k = col;                 // 防越界
+        if (k > col) k = col;             
         std::shuffle(cols.begin(), cols.end(), gen);
         col_ind.insert(col_ind.end(), cols.begin(), cols.begin() + k);
         ptr += k;
